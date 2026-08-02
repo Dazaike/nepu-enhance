@@ -263,3 +263,120 @@ html.nvt-modern-ui,
 .nvt-modern-ui ::-webkit-scrollbar-thumb:hover {
   background: var(--nvt-accent) !important;
 }
+
+/* ==========================================================================
+   7. Hero Carousel Banner (homepage top slider)
+   Real DOM confirmed via DevTools inspection of a.slide.media.media-slide:
+     <a class="slide media media-slide" style="background-image:url(...)">
+       <div class="slide-caption">
+         <div class="d-flex align-items-center"><div>
+           <div class="title">...</div>
+           <div class="slide-header">
+             <div class="imdb"><b>IMDB</b> 6.3</div>
+             <div>2026</div>
+             <div class="category text-12">Movie</div>
+             <div class="duration">108 min</div>
+             <div class="quality">Full HD</div>
+           </div>
+           <div class="description">...</div>
+         </div></div>
+       </div>
+     </a>
+   Was previously untouched by the overhaul - looked unstyled/inconsistent
+   against the restyled poster grid below it. The per-slide backdrop image
+   is set via an inline `background-image` style per movie, so we can't
+   safely override `background-image` directly without losing it; a
+   pseudo-element scrim layered on top handles the darkening/readability
+   gradient instead. ========================================================================== */
+.nvt-modern-ui .slide.media.media-slide {
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55) !important;
+  transition: background-size 0.6s ease !important;
+}
+
+.nvt-modern-ui .slide.media.media-slide:hover {
+  background-size: 108% !important;
+}
+
+.nvt-modern-ui .slide.media.media-slide::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  background: linear-gradient(to top, rgba(8, 12, 20, 0.92) 0%, rgba(8, 12, 20, 0.55) 35%, rgba(8, 12, 20, 0.05) 65%, transparent 100%) !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
+.nvt-modern-ui .slide-caption {
+  position: relative !important;
+  z-index: 2 !important;
+  padding: 32px !important;
+}
+
+.nvt-modern-ui .slide-caption .title {
+  font-size: 32px !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6) !important;
+  margin-bottom: 12px !important;
+  line-height: 1.2 !important;
+}
+
+.nvt-modern-ui .slide-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+  margin-bottom: 14px !important;
+}
+
+.nvt-modern-ui .slide-header > div {
+  color: var(--nvt-text-dim) !important;
+  font-size: 13px !important;
+}
+
+.nvt-modern-ui .slide-header .imdb {
+  background: rgba(251, 191, 36, 0.15) !important;
+  border: 1px solid rgba(251, 191, 36, 0.4) !important;
+  color: #fbbf24 !important;
+  padding: 3px 10px !important;
+  border-radius: 6px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.nvt-modern-ui .slide-header .imdb::before {
+  content: none !important;
+}
+
+.nvt-modern-ui .slide-header .imdb b {
+  color: #fbbf24 !important;
+}
+
+.nvt-modern-ui .slide-header .category {
+  background: rgba(37, 99, 235, 0.2) !important;
+  border: 1px solid rgba(37, 99, 235, 0.4) !important;
+  color: #60a5fa !important;
+  padding: 3px 10px !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+}
+
+.nvt-modern-ui .slide-header .quality {
+  background: rgba(96, 165, 250, 0.15) !important;
+  border: 1px solid rgba(96, 165, 250, 0.4) !important;
+  color: #60a5fa !important;
+  padding: 3px 10px !important;
+  border-radius: 6px !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+}
+
+.nvt-modern-ui .slide-caption .description {
+  color: var(--nvt-text-dim) !important;
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  max-width: 560px !important;
+  margin-top: 8px !important;
+}
