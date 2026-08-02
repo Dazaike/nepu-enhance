@@ -74,6 +74,7 @@ const NVT = (() => {
       ...partial,
       id,
       updatedAt: Date.now(),
+      deleted: false,
     };
     await chrome.storage.local.set({ [key]: merged });
     return merged;
@@ -94,31 +95,58 @@ const NVT = (() => {
   async function getHistoryFor(host, path) {
     const key = HIST_PREFIX + idFor(host, path);
     const res = await chrome.storage.local.get(key);
-    return res[key] || null;
+    const item = res[key] || null;
+    return item && !item.deleted ? item : null;
   }
 
   async function removeHistory(id) {
-    await chrome.storage.local.remove(HIST_PREFIX + id);
+    const key = HIST_PREFIX + id;
+    const existing = (await chrome.storage.local.get(key))[key] || null;
+    const tombstone = {
+      ...(existing || {}),
+      id,
+      deleted: true,
+      updatedAt: Date.now(),
+    };
+    await chrome.storage.local.set({ [key]: tombstone });
   }
 
-  async function listHistory() {
+  async function listHistory(includeDeleted = false) {
     const all = await chrome.storage.local.get(null);
     return Object.keys(all)
       .filter((k) => k.startsWith(HIST_PREFIX))
       .map((k) => all[k])
-      .filter(Boolean);
+      .filter((item) => item && (includeDeleted || !item.deleted));
   }
 
   async function clearHistory() {
     const all = await chrome.storage.local.get(null);
-    const keys = Object.keys(all).filter((k) => k.startsWith(HIST_PREFIX));
-    if (keys.length) await chrome.storage.local.remove(keys);
+    const now = Date.now();
+    const map = {};
+    for (const k of Object.keys(all)) {
+      if (k.startsWith(HIST_PREFIX)) {
+        const item = all[k];
+        if (item && !item.deleted) {
+          map[k] = { ...item, deleted: true, updatedAt: now };
+        }
+      }
+    }
+    if (Object.keys(map).length) await chrome.storage.local.set(map);
   }
 
   async function addWatchlist(item) {
     const id = idFor(item.host, item.path);
     const key = WL_PREFIX + id;
-    const entry = { ...item, id, addedAt: Date.now() };
+    const now = Date.now();
+    const existing = (await chrome.storage.local.get(key))[key] || null;
+    const entry = {
+      ...(existing || {}),
+      ...item,
+      id,
+      addedAt: (existing && existing.addedAt) || now,
+      updatedAt: now,
+      deleted: false,
+    };
     await chrome.storage.local.set({ [key]: entry });
     return entry;
   }
@@ -131,21 +159,45 @@ const NVT = (() => {
   }
 
   async function removeWatchlist(id) {
-    await chrome.storage.local.remove(WL_PREFIX + id);
+    const key = WL_PREFIX + id;
+    const existing = (await chrome.storage.local.get(key))[key] || null;
+    const tombstone = {
+      ...(existing || {}),
+      id,
+      deleted: true,
+      updatedAt: Date.now(),
+    };
+    await chrome.storage.local.set({ [key]: tombstone });
   }
 
-  async function listWatchlist() {
+  async function clearWatchlist() {
+    const all = await chrome.storage.local.get(null);
+    const now = Date.now();
+    const map = {};
+    for (const k of Object.keys(all)) {
+      if (k.startsWith(WL_PREFIX)) {
+        const item = all[k];
+        if (item && !item.deleted) {
+          map[k] = { ...item, deleted: true, updatedAt: now };
+        }
+      }
+    }
+    if (Object.keys(map).length) await chrome.storage.local.set(map);
+  }
+
+  async function listWatchlist(includeDeleted = false) {
     const all = await chrome.storage.local.get(null);
     return Object.keys(all)
       .filter((k) => k.startsWith(WL_PREFIX))
       .map((k) => all[k])
-      .filter(Boolean);
+      .filter((item) => item && (includeDeleted || !item.deleted));
   }
 
   async function getWatchlistFor(host, path) {
     const key = WL_PREFIX + idFor(host, path);
     const res = await chrome.storage.local.get(key);
-    return res[key] || null;
+    const item = res[key] || null;
+    return item && !item.deleted ? item : null;
   }
 
   async function isInWatchlist(host, path) {
@@ -244,6 +296,7 @@ const NVT = (() => {
     putWatchlistRaw,
     removeWatchlist,
     listWatchlist,
+    clearWatchlist,
     isInWatchlist,
     getWatchlistFor,
     getSubtitleAuth,

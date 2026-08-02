@@ -89,8 +89,13 @@ async function dropboxUpload(token, data) {
   }
 }
 
+function getItemTs(item) {
+  if (!item) return 0;
+  return item.updatedAt || item.addedAt || 0;
+}
+
 /** Keeps whichever copy of each record (by id) has the newer timestamp. */
-function mergeById(localList, remoteList, tsKey) {
+function mergeById(localList, remoteList) {
   const map = new Map();
   for (const item of remoteList || []) {
     if (item && item.id) map.set(item.id, item);
@@ -98,7 +103,7 @@ function mergeById(localList, remoteList, tsKey) {
   for (const item of localList || []) {
     if (!item || !item.id) continue;
     const existing = map.get(item.id);
-    if (!existing || (item[tsKey] || 0) >= (existing[tsKey] || 0)) {
+    if (!existing || getItemTs(item) >= getItemTs(existing)) {
       map.set(item.id, item);
     }
   }
@@ -118,13 +123,13 @@ async function performDropboxSync(force) {
     const remote = await dropboxDownload(token);
 
     const [localHistory, localWatchlist, localSettings] = await Promise.all([
-      NVT.listHistory(),
-      NVT.listWatchlist(),
+      NVT.listHistory(true),
+      NVT.listWatchlist(true),
       NVT.getSettings(),
     ]);
 
-    const mergedHistory = mergeById(localHistory, remote && remote.history, 'updatedAt');
-    const mergedWatchlist = mergeById(localWatchlist, remote && remote.watchlist, 'addedAt');
+    const mergedHistory = mergeById(localHistory, remote && remote.history);
+    const mergedWatchlist = mergeById(localWatchlist, remote && remote.watchlist);
 
     let mergedSettings = localSettings;
     if (remote && remote.settings && (remote.settings.updatedAt || 0) > (localSettings.updatedAt || 0)) {
