@@ -40,6 +40,7 @@ const NVT = (() => {
     releaseCheckIntervalHours: 12,
     releaseOptOutIds: [],
     nepuModernUi: true,
+    vidstackPlayerEnabled: false,
     updatedAt: 0,
   });
 

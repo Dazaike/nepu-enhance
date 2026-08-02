@@ -82,6 +82,16 @@
           <span class="switch-slider"></span>
         </label>
       </div>
+      <div class="setting-row">
+        <label class="switch-label" for="vidstack-toggle">Experimental: Vidstack video player</label>
+        <label class="switch">
+          <input type="checkbox" id="vidstack-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <p class="muted">Replaces Nepu's built-in player with the open-source Vidstack player when a
+        direct stream URL can be detected. Unverified against Nepu's live player - may not work on every
+        &quot;server&quot;, and disables Nepu's own ad delivery for whatever it does replace. Off by default.</p>
       <div class="setting-row column">
         <label for="min-duration-input">Minimum video length to track (seconds)</label>
         <input type="number" id="min-duration-input" min="0" step="1" />

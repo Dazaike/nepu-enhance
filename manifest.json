@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Nepu Watch Tracker & Subtitles",
-  "version": "5.4.9",
+  "version": "5.5.0",
   "description": "Continue Watching, a Watchlist, and OpenSubtitles captions for Nepu (nepu.to / nepu.is / nepu.net).",
   "permissions": ["storage", "scripting", "activeTab", "tabs", "identity", "notifications", "alarms"],
   "host_permissions": [
@@ -38,9 +38,30 @@
         "https://nepu.net/*", "https://www.nepu.net/*"
       ],
       "css": ["content/theme.css"],
-      "js": ["common/store.js", "common/nepu-title.js", "content/theme.js", "content/tracker.js", "content/subtitles.js", "content/home-rails.js"],
+      "js": ["common/store.js", "common/nepu-title.js", "content/theme.js", "content/tracker.js", "content/subtitles.js", "content/home-rails.js", "content/vidstack-player.js"],
       "run_at": "document_idle",
       "all_frames": false
+    },
+    {
+      "matches": [
+        "https://nepu.to/*", "https://www.nepu.to/*",
+        "https://nepu.is/*", "https://www.nepu.is/*",
+        "https://nepu.net/*", "https://www.nepu.net/*"
+      ],
+      "js": ["content/player-capture.js"],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["vendor/vidstack/*"],
+      "matches": [
+        "https://nepu.to/*", "https://www.nepu.to/*",
+        "https://nepu.is/*", "https://www.nepu.is/*",
+        "https://nepu.net/*", "https://www.nepu.net/*"
+      ]
     }
   ]
 }
