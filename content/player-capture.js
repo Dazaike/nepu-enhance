@@ -12,20 +12,26 @@
  * request, not as `video.src`.
  *
  * Communicates the captured URL to the isolated-world content script
- * (content/vidstack-player.js) via a DOM CustomEvent, since MAIN and
- * ISOLATED worlds don't share JS state but do share the DOM/event target.
+ * (content/vidstack-player.js) two ways, to cover both race directions:
+ * 1. A CustomEvent on `document` (not `window` - MAIN and ISOLATED
+ *    worlds each have their own `window` global; only `document` is
+ *    actually shared between them).
+ * 2. A `data-nvt-video-source` attribute on <html>, read on isolated
+ *    script startup in case the source was found before that script's
+ *    listener was registered (this one runs at document_start, the
+ *    isolated player script at document_idle).
  *
  * KNOWN LIMITATION: only sees requests made in the frame this script runs
  * in. If a given "server" on nepu.is loads playback inside a cross-origin
  * iframe (a different embed host), this script never runs there and
- * can't see that frame's network activity - only chrome.webRequest in the
- * background service worker can (see background.js `nvtWebRequestCapture`).
+ * there is no cross-frame fallback (see content/vidstack-player.js).
  */
 (function () {
   'use strict';
 
   if (window.__nvtPlayerCaptureInstalled) return;
   window.__nvtPlayerCaptureInstalled = true;
+  console.debug('[NVT vidstack] player-capture.js installed');
 
   const VIDEO_URL_RE = /\.(m3u8|mp4|webm|mkv)(\?|#|$)/i;
   let reported = false;
@@ -34,14 +40,16 @@
     if (reported || !url || typeof url !== 'string') return;
     if (!VIDEO_URL_RE.test(url)) return;
     reported = true;
+    console.debug('[NVT vidstack] source captured via', source, url);
     try {
-      window.dispatchEvent(
+      document.documentElement.dataset.nvtVideoSource = url;
+      document.dispatchEvent(
         new CustomEvent('nvt:video-source-found', {
           detail: { url, source },
         })
       );
-    } catch (_) {
-      /* ignore */
+    } catch (err) {
+      console.debug('[NVT vidstack] report failed', err);
     }
   }
 

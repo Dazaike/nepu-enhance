@@ -29,6 +29,7 @@
 
   if (window.__nvtVidstackMountInstalled) return;
   window.__nvtVidstackMountInstalled = true;
+  console.debug('[NVT vidstack] vidstack-player.js installed');
 
   let assetsLoaded = false;
   let mounted = false;
@@ -65,12 +66,13 @@
   function mount(url, video) {
     if (mounted) return;
     mounted = true;
+    console.debug('[NVT vidstack] mounting for source', url);
 
     injectAssets();
 
     const wrapper = findPlayerWrapper(video || document.querySelector('video'));
     if (!wrapper || !wrapper.parentElement) {
-      console.warn('[Nepu Watch Tracker] Vidstack: could not locate player wrapper to replace.');
+      console.warn('[NVT vidstack] could not locate player wrapper to replace - no <video> found yet?');
       return;
     }
 
@@ -86,10 +88,12 @@
     // hls.js from jsdelivr at runtime.
     player.addEventListener('provider-change', (e) => {
       const provider = e.detail;
+      console.debug('[NVT vidstack] provider-change', provider && provider.type);
       if (provider && provider.type === 'hls') {
         provider.library = chrome.runtime.getURL('vendor/vidstack/hls.min.js');
       }
     });
+    player.addEventListener('error', (e) => console.warn('[NVT vidstack] media-player error', e));
     player.style.width = '100%';
     player.style.aspectRatio = '16 / 9';
 
@@ -99,15 +103,34 @@
     player.appendChild(skin);
 
     wrapper.parentElement.insertBefore(player, wrapper.nextSibling);
+    console.debug('[NVT vidstack] player element inserted', player);
+
+    customElements.whenDefined('media-player').then(
+      () => console.debug('[NVT vidstack] media-player custom element defined/upgraded'),
+      () => {}
+    );
   }
 
-  window.addEventListener('nvt:video-source-found', (e) => {
-    const detail = e.detail || {};
-    if (!detail.url) return;
+  function maybeMount(url, source) {
+    if (!url) return;
     chrome.storage.local.get('settings', (res) => {
       const settings = res && res.settings;
-      if (!settings || settings.vidstackPlayerEnabled !== true) return;
-      mount(detail.url, document.querySelector('video'));
+      if (!settings || settings.vidstackPlayerEnabled !== true) {
+        console.debug('[NVT vidstack] source found via', source, 'but feature is disabled in Settings');
+        return;
+      }
+      mount(url, document.querySelector('video'));
     });
+  }
+
+  document.addEventListener('nvt:video-source-found', (e) => {
+    const detail = e.detail || {};
+    maybeMount(detail.url, 'event:' + detail.source);
   });
+
+  // Covers the case where player-capture.js (document_start) found the
+  // source and dispatched its event before this script (document_idle)
+  // had a listener registered.
+  const early = document.documentElement.dataset.nvtVideoSource;
+  if (early) maybeMount(early, 'early-attribute');
 })();
