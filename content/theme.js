@@ -12,6 +12,13 @@
   // Theme chrome is for the top page only (all_frames is enabled for tracking).
   if (window !== window.top) return;
 
+  function clearPinnedSearchStyles() {
+    document.querySelectorAll('.nvt-search-pinned, .nvt-typeahead-float').forEach((el) => {
+      el.classList.remove('nvt-search-pinned', 'nvt-typeahead-float');
+      if (el.style) el.removeAttribute('style');
+    });
+  }
+
   function applyTheme(enabled) {
     if (enabled !== false) {
       document.documentElement.classList.add('nvt-modern-ui');
@@ -19,6 +26,9 @@
       floatTypeaheadLists();
     } else {
       document.documentElement.classList.remove('nvt-modern-ui');
+      // Inline pin/float overrides are !important; strip them so the site
+      // chrome returns to stock when the modern UI is toggled off.
+      clearPinnedSearchStyles();
     }
   }
 
@@ -36,9 +46,23 @@
     );
   }
 
-  /** Move the floating search pill left + up (site centers it mid-header). */
+  function viewportTier() {
+    const w = window.innerWidth || document.documentElement.clientWidth || 1200;
+    if (w <= 640) return 'phone';
+    if (w <= 900) return 'tablet';
+    return 'desktop';
+  }
+
+  /** Move the floating search pill left + up (site centers it mid-header).
+   * Offsets scale down on tablet/phone so the pill doesn't sit under the
+   * collapsed sidebar gutter or overflow the viewport. */
   function pinSearchBar() {
     if (!document.documentElement.classList.contains('nvt-modern-ui')) return;
+
+    const tier = viewportTier();
+    const hostLeft = tier === 'phone' ? '52px' : tier === 'tablet' ? '64px' : '112px';
+    const hostTop = tier === 'desktop' ? '6px' : '8px';
+    const hostRight = tier === 'desktop' ? 'auto' : '10px';
 
     const hosts = document.querySelectorAll(
       '.header-search-fixed, .header-search, .app-header .app-search, .app .app-search, .app-search'
@@ -50,9 +74,9 @@
       if (isHost) {
         setImportant(el, {
           position: 'absolute',
-          top: '6px',
-          left: '112px',
-          right: 'auto',
+          top: hostTop,
+          left: hostLeft,
+          right: hostRight,
           bottom: 'auto',
           transform: 'none',
           'margin-left': '0',
@@ -68,13 +92,25 @@
         });
       } else {
         const open = el.classList.contains('result') || el.matches(':focus-within');
+        let width;
+        let maxWidth;
+        if (tier === 'phone') {
+          width = 'calc(100vw - 72px)';
+          maxWidth = open ? 'calc(100vw - 72px)' : 'none';
+        } else if (tier === 'tablet') {
+          width = open ? 'min(420px, calc(100vw - 80px))' : 'min(280px, calc(100vw - 120px))';
+          maxWidth = open ? 'calc(100vw - 80px)' : 'none';
+        } else {
+          width = open ? 'min(480px, 72vw)' : 'min(320px, 44vw)';
+          maxWidth = open ? '520px' : 'none';
+        }
         setImportant(el, {
           'margin-left': '0px',
           'margin-right': '0px',
           'margin-top': '0px',
           'margin-bottom': '0px',
-          width: open ? 'min(480px, 72vw)' : 'min(320px, 44vw)',
-          'max-width': open ? '520px' : 'none',
+          width: width,
+          'max-width': maxWidth,
           position: 'relative',
           top: '0px',
           left: '0px',
@@ -118,13 +154,23 @@
       list.classList.add('nvt-typeahead-float');
 
       const r = input.getBoundingClientRect();
-      const width = Math.min(Math.max(Math.round(r.width) || 320, 480), window.innerWidth - 16);
+      const vw = window.innerWidth || 360;
+      const inputW = Math.round(r.width) || 0;
+      // Phone: nearly full viewport so long titles aren't clipped.
+      // Desktop: at least 480px, capped to the viewport.
+      const width =
+        vw <= 640
+          ? Math.min(vw - 16, Math.max(inputW || 200, vw - 24))
+          : Math.min(Math.max(inputW || 320, 480), vw - 16);
       let left = Math.round(r.left);
-      if (left + width > window.innerWidth - 8) {
-        left = Math.max(8, window.innerWidth - width - 8);
+      if (left + width > vw - 8) {
+        left = Math.max(8, vw - width - 8);
       }
       const top = Math.round(r.bottom + 6);
-      const maxH = Math.max(160, Math.min(560, window.innerHeight - top - 12));
+      const maxH = Math.max(
+        140,
+        Math.min(vw <= 640 ? 360 : 560, window.innerHeight - top - 12)
+      );
 
       setImportant(list, {
         position: 'fixed',

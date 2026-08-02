@@ -110,3 +110,23 @@
   font-size: 11px;
   color: var(--text-dim);
 }
+
+.backup-actions {
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.backup-passphrase-confirm {
+  margin-top: 8px;
+}
+
+#backup-passphrase-input,
+#backup-passphrase-confirm {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#backup-status {
+  margin-top: 8px;
+  min-height: 1.2em;
+}

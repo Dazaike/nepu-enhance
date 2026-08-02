@@ -26,10 +26,8 @@
   const clearHistoryBtn = document.getElementById('clear-history-btn');
   const clearWatchlistBtn = document.getElementById('clear-watchlist-btn');
 
-  async function initSettings() {
-    const settings = await NVT.getSettings();
+  function applySettingsToForm(settings) {
     state.settings = settings;
-
     trackToggle.checked = !!settings.trackingEnabled;
     resumeToggle.checked = !!settings.resumeEnabled;
     autoApplyToggle.checked = !!settings.autoApplyCaptions;
@@ -44,6 +42,14 @@
     minDurationInput.value = settings.minDurationSeconds;
     completedRange.value = Math.round((settings.completedThreshold || 0) * 100);
     completedValueEl.textContent = completedRange.value;
+  }
+
+  async function loadSettingsForm() {
+    applySettingsToForm(await NVT.getSettings());
+  }
+
+  async function initSettings() {
+    await loadSettingsForm();
 
     trackToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ trackingEnabled: trackToggle.checked });
@@ -107,6 +113,183 @@
     const items = await NVT.listWatchlist();
     await Promise.all(items.map((item) => NVT.removeWatchlist(item.id)));
     alert('Watchlist cleared.');
+  });
+
+  // -------------------------------------------------------------------
+  // Import / Export backup (local JSON file)
+  // -------------------------------------------------------------------
+  const exportBackupBtn = document.getElementById('export-backup-btn');
+  const importBackupBtn = document.getElementById('import-backup-btn');
+  const importBackupFile = document.getElementById('import-backup-file');
+  const importReplaceToggle = document.getElementById('import-replace-toggle');
+  const backupPassphraseInput = document.getElementById('backup-passphrase-input');
+  const backupPassphraseConfirm = document.getElementById('backup-passphrase-confirm');
+  const backupStatusEl = document.getElementById('backup-status');
+
+  function setBackupStatus(message, kind) {
+    if (!backupStatusEl) return;
+    backupStatusEl.textContent = message || '';
+    backupStatusEl.style.color =
+      kind === 'error' ? '#fca5a5' : kind === 'ok' ? '#8dffb0' : '';
+  }
+
+  function downloadJson(filename, data) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
+  function readBackupPassphrase() {
+    return (backupPassphraseInput && backupPassphraseInput.value) || '';
+  }
+
+  function clearBackupPassphraseFields() {
+    if (backupPassphraseInput) backupPassphraseInput.value = '';
+    if (backupPassphraseConfirm) backupPassphraseConfirm.value = '';
+  }
+
+  exportBackupBtn.addEventListener('click', async () => {
+    const passphrase = readBackupPassphrase().trim();
+    const confirmPw = (backupPassphraseConfirm && backupPassphraseConfirm.value) || '';
+    if (passphrase) {
+      if (passphrase.length < 4) {
+        setBackupStatus('Passphrase must be at least 4 characters.', 'error');
+        return;
+      }
+      if (passphrase !== confirmPw.trim()) {
+        setBackupStatus('Passphrase and confirmation do not match.', 'error');
+        return;
+      }
+    } else if (confirmPw.trim()) {
+      setBackupStatus('Enter the passphrase in both fields, or clear confirmation.', 'error');
+      return;
+    }
+
+    exportBackupBtn.disabled = true;
+    setBackupStatus(
+      passphrase ? 'Encrypting secrets and building backup…' : 'Building backup…',
+      'info'
+    );
+    try {
+      const data = await NVT.exportBackup(passphrase ? { passphrase } : {});
+      const d = new Date();
+      const stamp = [
+        d.getFullYear(),
+        String(d.getMonth() + 1).padStart(2, '0'),
+        String(d.getDate()).padStart(2, '0'),
+      ].join('');
+      downloadJson(`nepu-watch-tracker-backup-${stamp}.json`, data);
+      const h = (data.history || []).filter((x) => x && !x.deleted).length;
+      const w = (data.watchlist || []).filter((x) => x && !x.deleted).length;
+      const bits = [`Exported ${h} history`, `${w} watchlist`, 'settings'];
+      if (data.secretsLocked) {
+        bits.push('Dropbox + API keys locked with passphrase');
+      } else {
+        if (data.dropboxAuth && (data.dropboxAuth.refreshToken || data.dropboxAuth.accessToken)) {
+          bits.push('Dropbox OAuth');
+        }
+        if (data.subtitleAuth && (data.subtitleAuth.osApiKey || data.subtitleAuth.tmdbApiKey)) {
+          bits.push('API keys');
+        }
+      }
+      setBackupStatus(bits.join(' · ') + '.', 'ok');
+      clearBackupPassphraseFields();
+    } catch (err) {
+      setBackupStatus((err && err.message) || 'Export failed.', 'error');
+    } finally {
+      exportBackupBtn.disabled = false;
+    }
+  });
+
+  importBackupBtn.addEventListener('click', () => {
+    importBackupFile.value = '';
+    importBackupFile.click();
+  });
+
+  importBackupFile.addEventListener('change', async () => {
+    const file = importBackupFile.files && importBackupFile.files[0];
+    if (!file) return;
+
+    const mode = importReplaceToggle.checked ? 'replace' : 'merge';
+    const confirmMsg =
+      mode === 'replace'
+        ? `Replace local Continue Watching, Watchlist, and settings with “${file.name}”? Items missing from the file will be removed. Dropbox tokens / API keys in the file will be restored. This cannot be undone.`
+        : `Merge “${file.name}” into this browser? For each item the newer copy wins. Dropbox tokens / API keys in the file will be restored.`;
+    if (!confirm(confirmMsg)) {
+      importBackupFile.value = '';
+      return;
+    }
+
+    importBackupBtn.disabled = true;
+    setBackupStatus('Importing…', 'info');
+    try {
+      const text = await file.text();
+      let payload;
+      try {
+        payload = JSON.parse(text);
+      } catch (_) {
+        throw new Error('File is not valid JSON.');
+      }
+
+      let passphrase = readBackupPassphrase().trim();
+      if (payload.secretsEncrypted && !passphrase) {
+        passphrase = window.prompt(
+          'This backup’s Dropbox OAuth and API keys are passphrase-locked.\nEnter the passphrase (or cancel to import only history/watchlist/settings):'
+        );
+        if (passphrase == null) {
+          // User cancelled secrets unlock — strip encrypted block and continue without secrets
+          passphrase = '';
+          delete payload.secretsEncrypted;
+          payload.secretsLocked = false;
+        } else {
+          passphrase = String(passphrase).trim();
+          if (!passphrase) {
+            throw new Error('Passphrase required to unlock Dropbox / API keys.');
+          }
+        }
+      }
+
+      // Accept Dropbox sync files (history/watchlist/settings, no format field).
+      const result = await NVT.importBackup(payload, {
+        mode,
+        passphrase: passphrase || undefined,
+      });
+      const bits = [
+        mode === 'replace' ? 'Replaced from file' : 'Merged from file',
+        `${result.history} history`,
+        `${result.watchlist} watchlist`,
+      ];
+      if (result.settings) bits.push('settings updated');
+      if (result.subtitleAuth) bits.push('API keys updated');
+      if (result.dropboxAuth) bits.push('Dropbox OAuth restored');
+      else if (result.secretsUnlocked === false && payload.secretsLocked) {
+        bits.push('secrets not unlocked');
+      }
+      setBackupStatus(bits.join(' · ') + '.', 'ok');
+      clearBackupPassphraseFields();
+      // Refresh form toggles / status bars from storage (do not re-bind listeners)
+      await loadSettingsForm();
+      await Promise.all([
+        refreshSubAuthStatus(),
+        refreshDropboxStatus(),
+        refreshReleaseStatusUI(),
+        refreshRecStatusUI(),
+      ]);
+      chrome.runtime.sendMessage({ type: 'UPDATE_RELEASE_ALARM' });
+      chrome.runtime.sendMessage({ type: 'UPDATE_RECOMMENDATIONS_ALARM' });
+    } catch (err) {
+      setBackupStatus((err && err.message) || 'Import failed.', 'error');
+    } finally {
+      importBackupBtn.disabled = false;
+      importBackupFile.value = '';
+    }
   });
 
   // -------------------------------------------------------------------

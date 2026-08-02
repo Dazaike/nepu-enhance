@@ -858,15 +858,13 @@
     });
     autoApplyToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ autoApplyCaptions: autoApplyToggle.checked });
+    });
     useTimeToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ useTimeProgress: useTimeToggle.checked });
       renderContinue();
     });
     modernUiToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ nepuModernUi: modernUiToggle.checked });
-    });
-      state.settings = await NVT.setSettings({ useTimeProgress: useTimeToggle.checked });
-      renderContinue();
     });
     dropboxAutoSyncToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ dropboxAutoSync: dropboxAutoSyncToggle.checked });

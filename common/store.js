@@ -357,6 +357,329 @@ const NVT = (() => {
     await chrome.storage.local.set({ [RECOMMENDATIONS_KEY]: next });
     return next;
   }
+
+  // --- Backup crypto (optional passphrase for Dropbox OAuth + API keys) ---
+  const BACKUP_FORMAT = 'nepu-watch-tracker';
+  const BACKUP_VERSION = 2;
+  const SECRETS_PBKDF2_ITERS = 250000;
+
+  function bytesToB64(bytes) {
+    const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    let binary = '';
+    for (let i = 0; i < u8.length; i++) binary += String.fromCharCode(u8[i]);
+    return btoa(binary);
+  }
+
+  function b64ToBytes(b64) {
+    const binary = atob(String(b64 || ''));
+    const out = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+    return out;
+  }
+
+  async function deriveSecretsKey(passphrase, saltBytes) {
+    const material = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(String(passphrase)),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: saltBytes,
+        iterations: SECRETS_PBKDF2_ITERS,
+        hash: 'SHA-256',
+      },
+      material,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  }
+
+  async function encryptSecretsBlob(secretsObj, passphrase) {
+    if (!passphrase) throw new Error('Passphrase is required to lock secrets.');
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveSecretsKey(passphrase, salt);
+    const plain = new TextEncoder().encode(JSON.stringify(secretsObj));
+    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain);
+    return {
+      v: 1,
+      alg: 'AES-GCM',
+      kdf: 'PBKDF2-SHA256',
+      iterations: SECRETS_PBKDF2_ITERS,
+      salt: bytesToB64(salt),
+      iv: bytesToB64(iv),
+      ciphertext: bytesToB64(cipher),
+    };
+  }
+
+  async function decryptSecretsBlob(blob, passphrase) {
+    if (!blob || !blob.ciphertext) throw new Error('Backup has no encrypted secrets.');
+    if (!passphrase) throw new Error('This backup’s Dropbox / API keys are locked — enter the passphrase.');
+    try {
+      const salt = b64ToBytes(blob.salt);
+      const iv = b64ToBytes(blob.iv);
+      const key = await deriveSecretsKey(passphrase, salt);
+      const plainBuf = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        b64ToBytes(blob.ciphertext)
+      );
+      return JSON.parse(new TextDecoder().decode(plainBuf));
+    } catch (err) {
+      if (err && /passphrase|locked/i.test(String(err.message))) throw err;
+      throw new Error('Wrong passphrase or corrupted secrets block.');
+    }
+  }
+
+  function normalizeDropboxAuthExport(auth) {
+    if (!auth) return null;
+    const out = {
+      appKey: auth.appKey || '',
+      accessToken: auth.accessToken || '',
+      refreshToken: auth.refreshToken || '',
+      expiresAt: auth.expiresAt || 0,
+      accountEmail: auth.accountEmail || '',
+    };
+    // Only include if there is something useful to restore.
+    if (!out.appKey && !out.refreshToken && !out.accessToken) return null;
+    return out;
+  }
+
+  /**
+   * Local file backup (options page Import/Export). Compatible with the
+   * Dropbox sync JSON shape (history + watchlist + settings) plus subtitle
+   * API keys and Dropbox OAuth (app key + refresh/access tokens).
+   *
+   * @param {{ passphrase?: string }} [opts]
+   *   If passphrase is set, Dropbox OAuth + subtitle keys are AES-GCM encrypted
+   *   into `secretsEncrypted` (PBKDF2). History/watchlist/settings stay plain
+   *   so the file is still useful without unlocking secrets.
+   */
+  async function exportBackup(opts) {
+    const passphrase = opts && opts.passphrase ? String(opts.passphrase) : '';
+    const [history, watchlist, settings, subtitleAuth, dropboxAuth] = await Promise.all([
+      listHistory(true),
+      listWatchlist(true),
+      getSettings(),
+      getSubtitleAuth(),
+      getDropboxAuth(),
+    ]);
+
+    const secrets = {
+      subtitleAuth: {
+        osApiKey: subtitleAuth.osApiKey || '',
+        tmdbApiKey: subtitleAuth.tmdbApiKey || '',
+      },
+      dropboxAuth: normalizeDropboxAuthExport(dropboxAuth),
+    };
+
+    const base = {
+      format: BACKUP_FORMAT,
+      version: BACKUP_VERSION,
+      exportedAt: Date.now(),
+      history,
+      watchlist,
+      settings,
+    };
+
+    if (passphrase) {
+      base.secretsEncrypted = await encryptSecretsBlob(secrets, passphrase);
+      base.secretsLocked = true;
+    } else {
+      base.subtitleAuth = secrets.subtitleAuth;
+      if (secrets.dropboxAuth) base.dropboxAuth = secrets.dropboxAuth;
+      base.secretsLocked = false;
+    }
+
+    return base;
+  }
+
+  function itemTs(item) {
+    if (!item) return 0;
+    return item.updatedAt || item.addedAt || 0;
+  }
+
+  function mergeListsById(localList, remoteList) {
+    const map = new Map();
+    for (const item of remoteList || []) {
+      if (item && item.id) map.set(item.id, item);
+    }
+    for (const item of localList || []) {
+      if (!item || !item.id) continue;
+      const existing = map.get(item.id);
+      if (!existing || itemTs(item) >= itemTs(existing)) {
+        map.set(item.id, item);
+      }
+    }
+    return Array.from(map.values());
+  }
+
+  /**
+   * @param {object} payload - exportBackup() JSON or Dropbox sync file
+   * @param {{ mode?: 'merge' | 'replace', passphrase?: string }} [opts]
+   *   merge   — newest-wins per id (default; safe for multi-device)
+   *   replace — overwrite history/watchlist/settings with the file
+   *   passphrase — unlock secretsEncrypted (Dropbox OAuth + API keys)
+   */
+  async function importBackup(payload, opts) {
+    const mode = (opts && opts.mode) === 'replace' ? 'replace' : 'merge';
+    const passphrase = opts && opts.passphrase ? String(opts.passphrase) : '';
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('Invalid backup file (not a JSON object).');
+    }
+    if (payload.format && payload.format !== BACKUP_FORMAT) {
+      throw new Error(`Unsupported backup format: ${payload.format}`);
+    }
+    if (payload.version != null && Number(payload.version) > BACKUP_VERSION) {
+      throw new Error(`Backup version ${payload.version} is newer than this extension supports.`);
+    }
+
+    // Unlock passphrase-protected secrets (Dropbox OAuth + subtitle keys).
+    let unlockedSecrets = null;
+    if (payload.secretsEncrypted) {
+      unlockedSecrets = await decryptSecretsBlob(payload.secretsEncrypted, passphrase);
+    }
+
+    const incomingHistory = Array.isArray(payload.history) ? payload.history : null;
+    const incomingWatchlist = Array.isArray(payload.watchlist) ? payload.watchlist : null;
+    const incomingSettings =
+      payload.settings && typeof payload.settings === 'object' ? payload.settings : null;
+    const incomingSub =
+      (unlockedSecrets && unlockedSecrets.subtitleAuth) ||
+      (payload.subtitleAuth && typeof payload.subtitleAuth === 'object'
+        ? payload.subtitleAuth
+        : null);
+    const incomingDropbox =
+      (unlockedSecrets && unlockedSecrets.dropboxAuth) ||
+      (payload.dropboxAuth && typeof payload.dropboxAuth === 'object'
+        ? payload.dropboxAuth
+        : null);
+
+    if (
+      !incomingHistory &&
+      !incomingWatchlist &&
+      !incomingSettings &&
+      !incomingSub &&
+      !incomingDropbox
+    ) {
+      throw new Error(
+        'Backup has no history, watchlist, settings, API keys, or Dropbox auth to import.'
+      );
+    }
+
+    const [localHistory, localWatchlist, localSettings] = await Promise.all([
+      listHistory(true),
+      listWatchlist(true),
+      getSettings(),
+    ]);
+
+    let nextHistory = localHistory;
+    let nextWatchlist = localWatchlist;
+    if (incomingHistory) {
+      nextHistory =
+        mode === 'replace'
+          ? incomingHistory.filter((h) => h && h.id)
+          : mergeListsById(localHistory, incomingHistory);
+    }
+    if (incomingWatchlist) {
+      nextWatchlist =
+        mode === 'replace'
+          ? incomingWatchlist.filter((w) => w && w.id)
+          : mergeListsById(localWatchlist, incomingWatchlist);
+    }
+
+    if (mode === 'replace' && (incomingHistory || incomingWatchlist)) {
+      // Tombstone anything local that is not present in the replace set so
+      // Dropbox-style soft-deletes and listHistory(false) stay consistent.
+      const keepHist = new Set(nextHistory.map((h) => h.id));
+      const keepWl = new Set(nextWatchlist.map((w) => w.id));
+      const now = Date.now();
+      for (const h of localHistory) {
+        if (h && h.id && !keepHist.has(h.id) && !h.deleted) {
+          nextHistory.push({ ...h, deleted: true, updatedAt: now });
+        }
+      }
+      for (const w of localWatchlist) {
+        if (w && w.id && !keepWl.has(w.id) && !w.deleted) {
+          nextWatchlist.push({ ...w, deleted: true, updatedAt: now });
+        }
+      }
+    }
+
+    const writes = [];
+    for (const h of nextHistory) {
+      if (h && h.id) writes.push(putHistoryRaw(h));
+    }
+    for (const w of nextWatchlist) {
+      if (w && w.id) writes.push(putWatchlistRaw(w));
+    }
+
+    let nextSettings = localSettings;
+    if (incomingSettings) {
+      if (mode === 'replace' || (incomingSettings.updatedAt || 0) >= (localSettings.updatedAt || 0)) {
+        nextSettings = {
+          ...DEFAULT_SETTINGS,
+          ...localSettings,
+          ...incomingSettings,
+          updatedAt: Date.now(),
+        };
+        writes.push(chrome.storage.local.set({ [SETTINGS_KEY]: nextSettings }));
+      }
+    }
+
+    if (incomingSub) {
+      const patch = {};
+      if (typeof incomingSub.osApiKey === 'string' && incomingSub.osApiKey) {
+        patch.osApiKey = incomingSub.osApiKey;
+      }
+      if (typeof incomingSub.tmdbApiKey === 'string' && incomingSub.tmdbApiKey) {
+        patch.tmdbApiKey = incomingSub.tmdbApiKey;
+      }
+      if (Object.keys(patch).length) writes.push(setSubtitleAuth(patch));
+    }
+
+    let restoredDropbox = false;
+    if (incomingDropbox) {
+      const dbPatch = {};
+      if (typeof incomingDropbox.appKey === 'string' && incomingDropbox.appKey) {
+        dbPatch.appKey = incomingDropbox.appKey;
+      }
+      if (typeof incomingDropbox.accessToken === 'string' && incomingDropbox.accessToken) {
+        dbPatch.accessToken = incomingDropbox.accessToken;
+      }
+      if (typeof incomingDropbox.refreshToken === 'string' && incomingDropbox.refreshToken) {
+        dbPatch.refreshToken = incomingDropbox.refreshToken;
+      }
+      if (incomingDropbox.expiresAt != null && incomingDropbox.expiresAt !== '') {
+        dbPatch.expiresAt = Number(incomingDropbox.expiresAt) || 0;
+      }
+      if (typeof incomingDropbox.accountEmail === 'string') {
+        dbPatch.accountEmail = incomingDropbox.accountEmail;
+      }
+      if (Object.keys(dbPatch).length) {
+        writes.push(setDropboxAuth(dbPatch));
+        restoredDropbox = !!(dbPatch.refreshToken || dbPatch.accessToken);
+      }
+    }
+
+    await Promise.all(writes);
+
+    return {
+      mode,
+      history: nextHistory.filter((h) => h && !h.deleted).length,
+      watchlist: nextWatchlist.filter((w) => w && !w.deleted).length,
+      settings: nextSettings !== localSettings,
+      subtitleAuth: !!(incomingSub && (incomingSub.osApiKey || incomingSub.tmdbApiKey)),
+      dropboxAuth: restoredDropbox,
+      secretsUnlocked: !!unlockedSecrets,
+    };
+  }
+
   return {
     HIST_PREFIX,
     WL_PREFIX,
@@ -394,6 +717,8 @@ const NVT = (() => {
     setReleaseStatus,
     getRecommendations,
     setRecommendations,
+    exportBackup,
+    importBackup,
   };
 
 })();

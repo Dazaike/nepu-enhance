@@ -34,6 +34,7 @@
         padding: 4px 2px 14px;
         scrollbar-width: none;
         scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
       }
       .nvt-rail::-webkit-scrollbar {
         display: none;
@@ -194,6 +195,68 @@
         font-size: 11px;
         margin-top: 2px;
         opacity: 0.65;
+      }
+
+      /* Tablet: slightly denser rails */
+      @media (max-width: 900px) {
+        .nvt-rail-section { margin-bottom: 18px; }
+        .nvt-rail {
+          gap: 12px;
+          padding: 2px 0 12px;
+        }
+        .nvt-rail-card { width: 132px; }
+        .nvt-rail-thumb {
+          width: 132px;
+          height: 198px;
+          border-radius: 8px;
+        }
+        .nvt-rail-title { font-size: 12px; margin-top: 6px; }
+      }
+
+      /* Phone: smaller posters, roomier tap targets */
+      @media (max-width: 640px) {
+        .nvt-rail-section { margin-bottom: 16px; }
+        .nvt-rail-section .app-heading { margin-bottom: 8px; }
+        .nvt-rail {
+          gap: 10px;
+          padding: 2px 0 10px;
+        }
+        .nvt-rail-card { width: 112px; }
+        .nvt-rail-thumb {
+          width: 112px;
+          height: 168px;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        .nvt-rail-fallback { font-size: 24px; }
+        .nvt-rail-title {
+          font-size: 11.5px;
+          margin-top: 6px;
+        }
+        .nvt-rail-meta { font-size: 10px; }
+        .nvt-rail-remove {
+          width: 28px;
+          height: 28px;
+          font-size: 15px;
+          opacity: 0.92;
+          background: rgba(0, 0, 0, 0.72);
+        }
+        .nvt-rail-badge {
+          font-size: 9px;
+          padding: 2px 5px;
+        }
+        .nvt-rail-badge.nvt-rail-kind { font-size: 8px; }
+      }
+
+      /* Touch: no hover-only chrome; keep remove visible */
+      @media (hover: none) {
+        .nvt-rail-card:hover { transform: none; }
+        .nvt-rail-card:hover .nvt-rail-thumb img { transform: none; }
+        .nvt-rail-card:hover .nvt-rail-thumb {
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+        }
+        .nvt-rail-remove { opacity: 0.9; }
+        .nvt-rail-remove:active { background: #ef4444; }
       }
     `;
     document.head.appendChild(style);

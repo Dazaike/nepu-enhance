@@ -212,6 +212,57 @@
     </div>
   </section>
 
+  <section class="options-card">
+    <h2>Import &amp; export</h2>
+    <p class="muted">
+      Download a JSON backup of Continue Watching, Watchlist, settings,
+      OpenSubtitles / TMDB API keys, and <strong>Dropbox OAuth</strong>
+      (app key + refresh/access tokens) so you can restore sync without
+      reconnecting. Import merges by default (newest wins), or replace from the file.
+    </p>
+    <p class="muted">
+      Optional passphrase: locks Dropbox tokens and API keys with AES-GCM
+      (PBKDF2). History / watchlist / settings stay readable; you’ll need the
+      passphrase on import to restore Dropbox and keys. Leave blank to store
+      secrets in plain JSON — treat the file like a password.
+    </p>
+    <div class="settings-list">
+      <div class="setting-row column">
+        <label for="backup-passphrase-input">Passphrase for secrets (optional)</label>
+        <input
+          type="password"
+          id="backup-passphrase-input"
+          placeholder="Leave blank for plaintext tokens…"
+          autocomplete="new-password"
+          spellcheck="false"
+        />
+        <input
+          type="password"
+          id="backup-passphrase-confirm"
+          placeholder="Confirm passphrase (export only)…"
+          autocomplete="new-password"
+          spellcheck="false"
+          class="backup-passphrase-confirm"
+        />
+      </div>
+      <div class="tag-input-row backup-actions">
+        <button type="button" id="export-backup-btn" class="btn btn-primary btn-sm">Export backup</button>
+        <button type="button" id="import-backup-btn" class="btn btn-secondary btn-sm">Import backup…</button>
+        <input type="file" id="import-backup-file" accept="application/json,.json" hidden />
+      </div>
+      <div class="setting-row">
+        <label class="switch-label" for="import-replace-toggle">
+          On import: replace local data (instead of merge)
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="import-replace-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div id="backup-status" class="muted"></div>
+    </div>
+  </section>
+
   <section class="options-card danger-zone">
     <h2>Danger zone</h2>
     <p class="muted">These actions cannot be undone.</p>

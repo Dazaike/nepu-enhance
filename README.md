@@ -3,7 +3,7 @@
 Chrome **Manifest V3** extension for [Nepu](https://nepu.to/) and its mirrors
 (`nepu.is`, `nepu.net`).
 
-**Current version: 5.7.9**
+**Current version: 6.0.0**
 
 ## Highlights
 
@@ -12,9 +12,10 @@ Chrome **Manifest V3** extension for [Nepu](https://nepu.to/) and its mirrors
 - **Homepage rails** — Continue Watching + Watchlist injected above Nepu’s own rows
 - **Discovery rails** — multi-row TMDB catalog (personalized + Now Playing, Trending, genres, anime)
 - **Subtitles** — OpenSubtitles search/download/style, optional TMDB matching, auto-apply
-- **Dropbox sync** — backup/merge CW, Watchlist, and settings (API keys stay local)
+- **Dropbox sync** — backup/merge CW, Watchlist, and settings across devices
+- **Local import / export** — JSON backup of history, watchlist, settings, API keys, and Dropbox OAuth (optional passphrase lock)
 - **New episode alerts** — TMDB air-date checks + desktop notifications + **clear NEW** control
-- **Modern UI** — dark theme, raised poster hover, smaller hero, pinned search + floating results
+- **Modern UI** — Netflix-style overhaul with **mobile / tablet layout**, raised poster hover, smaller hero, pinned search + floating results
 
 ## Install (unpacked)
 
@@ -86,7 +87,21 @@ Dropbox **app folder** (newest wins on merge).
 3. Paste the **App key** and click **Connect to Dropbox**.
 
 Sync runs when you open a Nepu page (throttled) or via **Sync now** in the
-popup. Auto-apply and API keys stay local.
+popup.
+
+### Local import / export
+
+On the **Options** page, **Import & export** downloads or restores a JSON backup:
+
+- Continue Watching history, Watchlist, and settings
+- OpenSubtitles / TMDB API keys
+- Dropbox OAuth (app key + refresh/access tokens) so you can restore sync without reconnecting
+
+Optional **passphrase**: AES-GCM-encrypts Dropbox tokens and API keys (PBKDF2);
+history / watchlist / settings stay readable. Leave blank for plaintext secrets —
+treat the file like a password. Import can **merge** (newest wins) or **replace**
+local data. Dropbox cloud sync files are also accepted for offline restore of
+history / watchlist / settings.
 
 ### New release tracking & notifications
 
@@ -167,6 +182,21 @@ for tagged versions and downloadable source archives.
 
 ### Changelog (recent)
 
+#### 6.0.0
+
+- **Local import / export** on Options: full JSON backup (history, watchlist, settings, API keys, Dropbox OAuth)
+- Optional **passphrase lock** for Dropbox tokens + API keys (AES-GCM / PBKDF2)
+- **Modern UI mobile & tablet layout**: responsive gutters, search pin, hero, typeahead, denser rails
+- Touch-friendly rails (always-visible remove ×) and soft poster chrome on `(hover: none)`
+- Fix popup **Modern Netflix UI** toggle (listeners were nested under Auto-apply captions)
+- Clear pinned search inline styles when modern UI is turned off
+
+#### 5.7.9
+
+- Continue Watching tracking fix: re-qualify videos when duration arrives late
+- Scan shadow roots + same-origin iframe players (`all_frames`)
+- Stable history keys (pathname only); theme/rails stay top-frame only
+
 #### 5.7.8
 
 - Homepage Continue Watching rail: **×** remove button (hover on poster)
@@ -191,5 +221,7 @@ for tagged versions and downloadable source archives.
 
 - Data stays in the browser unless you use OpenSubtitles/TMDB (calls you
   trigger or background jobs you enable) or connect Dropbox.
-- OpenSubtitles / TMDB keys are **not** uploaded to Dropbox.
+- OpenSubtitles / TMDB keys are **not** uploaded to Dropbox cloud sync.
+- Local **Export backup** can include API keys and Dropbox OAuth tokens (optionally
+  passphrase-encrypted). Keep that file private.
 - Cross-origin player iframes cannot receive injected captions (browser limit).
