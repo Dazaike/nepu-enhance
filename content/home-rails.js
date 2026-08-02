@@ -45,10 +45,6 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: transform 0.15s ease;
-      }
-      .nvt-rail-card:hover .nvt-rail-thumb {
-        transform: scale(1.03);
       }
       .nvt-rail-thumb img {
         width: 100%;

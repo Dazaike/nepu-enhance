@@ -115,11 +115,15 @@ html.nvt-modern-ui,
   background: var(--nvt-bg-elevated) !important;
   border: 1px solid var(--nvt-border) !important;
   padding: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
   transition: border-color 0.2s ease !important;
 }
 
 .nvt-modern-ui .list-movie:hover {
   border-color: var(--nvt-border-hover) !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 .nvt-modern-ui .list-media {
@@ -190,12 +194,11 @@ html.nvt-modern-ui,
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  box-shadow: 0 0 20px rgba(37, 99, 235, 0.6) !important;
-  transition: transform 0.2s ease, background-color 0.2s ease !important;
+  box-shadow: none !important;
 }
 
 .nvt-modern-ui .list-movie:hover .play-btn {
-  transform: translate(-50%, -50%) scale(1.1) !important;
+  transform: translate(-50%, -50%) !important;
   background: var(--nvt-accent) !important;
 }
 
