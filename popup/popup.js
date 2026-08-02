@@ -268,15 +268,28 @@
       await NVT.removeWatchlist(item.id);
       renderWatchlist();
     });
+    const clearBtn = root.querySelector('.clear-new-btn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await NVT.clearNewReleaseBadge(item.id);
+        renderWatchlist();
+      });
+    }
   }
 
   function buildWatchlistListRow(item) {
     const row = document.createElement('div');
     row.className = 'row';
     let meta = seasonEpisodeLabel(item);
-    if (item.hasNewRelease && item.latestSeason != null && item.latestEpisode != null) {
+    const hasNew = item.hasNewRelease && item.latestSeason != null && item.latestEpisode != null;
+    if (hasNew) {
       meta += ` &middot; <span style="color:#10b981;font-weight:600">NEW S${item.latestSeason} E${item.latestEpisode}</span>`;
     }
+    const clearNewBtn = hasNew
+      ? `<button type="button" class="icon-btn clear-new-btn" title="Clear NEW badge (mark caught up)">✓</button>`
+      : '';
     row.innerHTML = `
       ${thumbMarkup(item.poster, 'lg')}
       <div class="row-body">
@@ -284,6 +297,7 @@
         <div class="row-meta">${meta}</div>
       </div>
       <div class="row-actions">
+        ${clearNewBtn}
         <button type="button" class="icon-btn open-btn" title="Open">&#9654;</button>
         <button type="button" class="icon-btn remove-wl-btn" title="Remove">&#10005;</button>
       </div>
@@ -297,9 +311,10 @@
     const se = seLabel(item);
     const el = document.createElement('div');
     el.className = 'grid-item';
+    const hasNew = item.hasNewRelease && item.latestSeason != null && item.latestEpisode != null;
     let badgeHtml = '';
-    if (item.hasNewRelease && item.latestSeason != null && item.latestEpisode != null) {
-      badgeHtml = `<div class="grid-badge new-release" title="New episode released!">NEW S${item.latestSeason} E${item.latestEpisode}</div>`;
+    if (hasNew) {
+      badgeHtml = `<button type="button" class="grid-badge new-release clear-new-btn" title="Clear NEW badge (mark caught up)">NEW S${item.latestSeason} E${item.latestEpisode} · ✓</button>`;
     } else if (se) {
       badgeHtml = `<div class="grid-badge">${escapeHtml(se)}</div>`;
     }

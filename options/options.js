@@ -423,7 +423,7 @@
   });
 
   // -------------------------------------------------------------------
-  // Recommended For You (TMDB-powered)
+  // Discovery rails (TMDB multi-row homepage)
   // -------------------------------------------------------------------
   const recRefreshNowBtn = document.getElementById('rec-refresh-now-btn');
   const recStatusEl = document.getElementById('rec-status');
@@ -435,12 +435,18 @@
 
   async function refreshRecStatusUI() {
     const [rec, settings] = await Promise.all([NVT.getRecommendations(), NVT.getSettings()]);
-    const bits = [settings.recommendationsEnabled !== false ? 'Recommendations enabled' : 'Recommendations disabled'];
+    const bits = [settings.recommendationsEnabled !== false ? 'Discovery rails enabled' : 'Discovery rails disabled'];
     if (rec.checking) {
       bits.push('refreshing…');
     } else if (rec.updatedAt) {
       bits.push(`last refreshed ${new Date(rec.updatedAt).toLocaleString()}`);
-      bits.push(`${rec.items.length} item(s) · ${rec.reason || 'Recommended For You'}`);
+      const rails = Array.isArray(rec.rails) ? rec.rails : [];
+      const itemCount = rails.length
+        ? rails.reduce((n, r) => n + ((r && r.items && r.items.length) || 0), 0)
+        : (rec.items || []).length;
+      const railCount = rails.length || (rec.items && rec.items.length ? 1 : 0);
+      bits.push(`${railCount} rail(s) · ${itemCount} poster(s)`);
+      if (rec.reason) bits.push(rec.reason);
     }
     if (rec.lastError) bits.push(`error: ${rec.lastError}`);
     setRecStatusUI(bits.join(' · '), rec.lastError ? 'error' : settings.recommendationsEnabled !== false ? 'ok' : 'warn');
@@ -448,7 +454,7 @@
 
   recRefreshNowBtn.addEventListener('click', async () => {
     recRefreshNowBtn.disabled = true;
-    setRecStatusUI('Refreshing recommendations from TMDB…', 'info');
+    setRecStatusUI('Refreshing discovery rails from TMDB…', 'info');
     try {
       const res = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'REFRESH_RECOMMENDATIONS_NOW' }, resolve);

@@ -181,15 +181,16 @@
   </section>
 
   <section class="options-card">
-    <h2>Recommended For You</h2>
+    <h2>Homepage discovery rails</h2>
     <p class="muted">
-      Nepu's own catalog is complete but its recommendations are weak — this uses TMDB (the same free API key
-      configured above for OpenSubtitles matching) to suggest movies/shows based on your Watchlist and
-      Continue Watching, injected as a rail on the homepage. Clicking a recommendation searches for it on Nepu.
+      Multi-row discovery powered by TMDB (same free key as above): personalized
+      “Because you watched…”, Now Playing, Trending Movies/TV, Popular TV, Anime Spotlight, and genre
+      rows. Your <strong>Continue Watching</strong> and <strong>Watchlist</strong> rails always stay first.
+      Clicking a poster opens the best Nepu match when possible.
     </p>
     <div class="settings-list">
       <div class="setting-row">
-        <label class="switch-label" for="rec-enabled-toggle">Show "Recommended For You" rail</label>
+        <label class="switch-label" for="rec-enabled-toggle">Show discovery rails on homepage</label>
         <label class="switch">
           <input type="checkbox" id="rec-enabled-toggle" />
           <span class="switch-slider"></span>
@@ -205,7 +206,7 @@
         </select>
       </div>
       <div class="tag-input-row">
-        <button type="button" id="rec-refresh-now-btn" class="btn btn-primary btn-sm">Refresh recommendations now</button>
+        <button type="button" id="rec-refresh-now-btn" class="btn btn-primary btn-sm">Refresh discovery rails now</button>
       </div>
       <div id="rec-status" class="muted"></div>
     </div>

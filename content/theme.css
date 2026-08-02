@@ -44,6 +44,84 @@ html.nvt-modern-ui,
   -webkit-font-smoothing: antialiased;
 }
 
+/* 1b. Kill the site's centered max-width shell.
+   On wide viewports nepu centers .app (max-width + margin:auto), leaving
+   large empty gutters — most visible as dead space left of the sidebar
+   and right of the hero. Force full-bleed so the nav hugs the viewport
+   edge and content uses the remaining width. */
+html.nvt-modern-ui,
+html.nvt-modern-ui body {
+  max-width: none !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.nvt-modern-ui .app,
+.nvt-modern-ui #app,
+.nvt-modern-ui .app-body,
+.nvt-modern-ui .app-wrapper,
+.nvt-modern-ui .app-container,
+.nvt-modern-ui .main-wrapper,
+.nvt-modern-ui .page-wrapper,
+.nvt-modern-ui .wrapper {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+/* Header / top bar: span full viewport, not the old centered shell. */
+.nvt-modern-ui .app-header,
+.nvt-modern-ui .app-navbar,
+.nvt-modern-ui .navbar {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+}
+
+/* Main column beside the left nav — drop Bootstrap-style container caps
+   that re-center the hero under a max-width. Keep side gutters so content
+   doesn't sit flush against the edges after full-bleed (site only had 10px). */
+.nvt-modern-ui .app-content,
+.nvt-modern-ui .app-main,
+.nvt-modern-ui .app-page,
+.nvt-modern-ui .app-section,
+.nvt-modern-ui main,
+.nvt-modern-ui main.app-content,
+.nvt-modern-ui .container,
+.nvt-modern-ui .container-fluid,
+.nvt-modern-ui .container-lg,
+.nvt-modern-ui .container-xl,
+.nvt-modern-ui .container-xxl {
+  max-width: none !important;
+  width: 100% !important;
+  padding-left: 48px !important;
+  padding-right: 48px !important;
+  box-sizing: border-box !important;
+}
+
+/* Sidebar hugs the left edge; kill phantom off-canvas / dual-rail offset. */
+.nvt-modern-ui .app-sidebar,
+.nvt-modern-ui .sidebar,
+.nvt-modern-ui aside,
+.nvt-modern-ui aside.app-sidebar,
+.nvt-modern-ui .app-menu,
+.nvt-modern-ui .side-menu,
+.nvt-modern-ui .navbar-vertical,
+.nvt-modern-ui .nav-left {
+  margin-left: 0 !important;
+  left: 0 !important;
+}
+
+
+
 /* 2. Glassmorphism Navigation / Header */
 .nvt-modern-ui .app-header {
   background: var(--nvt-glass) !important;
@@ -53,34 +131,234 @@ html.nvt-modern-ui,
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5) !important;
 }
 
-/* Search input in header */
+/* Hide site Register / Login header links */
+.nvt-modern-ui .app-header .navbar-user a.nav-link[href*="/register"],
+.nvt-modern-ui .app-header .navbar-user a.nav-link[href*="/login"],
+.nvt-modern-ui .app-header a.nav-link[href$="/register"],
+.nvt-modern-ui .app-header a.nav-link[href$="/login"],
+.nvt-modern-ui .app-header a.nav-link[aria-label="Register"],
+.nvt-modern-ui .app-header a.nav-link[aria-label="Login"] {
+  display: none !important;
+}
+
+
+/* -------------------------------------------------------------------------
+   Search bar position
+   Site CSS (app.css):
+     .app .app-search { margin-left:40px; margin-top:20px; width:340px; }
+     .header-search-fixed { left:50%; transform:translateX(-50%); top:10%; }
+   The floating pill the user sees is usually .header-search-fixed / .app
+   .app-search — NOT nested under .app-header, so older rules never hit it.
+   ------------------------------------------------------------------------- */
+
+/* JS also adds .nvt-search-pinned + inline !important as a hard override. */
+html.nvt-modern-ui .nvt-search-pinned.header-search-fixed,
+html.nvt-modern-ui .nvt-search-pinned.header-search,
+html.nvt-modern-ui .nvt-search-pinned.app-search {
+  margin-left: 0 !important;
+  margin-top: 0 !important;
+  transform: none !important;
+}
+
+/* Centered floating search host → pin top-left of the content area.
+   overflow:visible so the typeahead can hang outside the pill;
+   z-index above the hero carousel so results aren't covered mid-type. */
+html.nvt-modern-ui .header-search-fixed,
+.nvt-modern-ui .header-search-fixed,
+html.nvt-modern-ui .header-search,
+.nvt-modern-ui .header-search {
+  position: absolute !important;
+  top: 6px !important;
+  left: 112px !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  z-index: 3000 !important;
+  overflow: visible !important;
+}
+
+/* The search pill itself */
+html.nvt-modern-ui .app .app-search,
+html.nvt-modern-ui .app-search,
+html.nvt-modern-ui .header-search-fixed .app-search,
+html.nvt-modern-ui .header-search .app-search,
+html.nvt-modern-ui .app-header .app-search,
+html.nvt-modern-ui .app-header .video-search,
+html.nvt-modern-ui .app-navbar .app-search,
+html.nvt-modern-ui .navbar .app-search,
+.nvt-modern-ui .app .app-search,
+.nvt-modern-ui .app-search {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  width: min(320px, 44vw) !important;
+  max-width: none !important;
+  position: relative !important;
+  top: 0 !important;
+  left: 0 !important;
+  transform: none !important;
+  align-self: flex-start !important;
+  float: none !important;
+  overflow: visible !important;
+  z-index: 3000 !important;
+}
+
+/* Site adds .result while typeahead is open — widen so titles aren't cut off */
+html.nvt-modern-ui .app .app-search.result,
+html.nvt-modern-ui .app-search.result,
+html.nvt-modern-ui .app-search:focus-within,
+.nvt-modern-ui .app .app-search.result,
+.nvt-modern-ui .app-search:focus-within {
+  width: min(480px, 72vw) !important;
+  max-width: 520px !important;
+}
+
+html.nvt-modern-ui .app-header .navbar,
+html.nvt-modern-ui .app-header .app-navbar,
+html.nvt-modern-ui .app .app-header .navbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding-top: 2px !important;
+  gap: 8px !important;
+  overflow: visible !important;
+}
+
 .nvt-modern-ui .video-search,
 .nvt-modern-ui .app-search input,
-.nvt-modern-ui .typeahead__field input {
+.nvt-modern-ui .typeahead__field input,
+html.nvt-modern-ui .app .app-search input {
   background: rgba(255, 255, 255, 0.07) !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   border-radius: 20px !important;
   color: var(--nvt-text) !important;
-  padding: 8px 16px !important;
+  padding: 8px 14px 8px 44px !important;
   font-size: 13px !important;
   transition: all 0.2s ease !important;
+  width: 100% !important;
+  height: auto !important;
+  box-shadow: none !important;
 }
 
 .nvt-modern-ui .video-search:focus,
 .nvt-modern-ui .app-search input:focus,
-.nvt-modern-ui .typeahead__field input:focus {
+.nvt-modern-ui .typeahead__field input:focus,
+html.nvt-modern-ui .app .app-search input:focus {
   background: rgba(255, 255, 255, 0.12) !important;
   border-color: var(--nvt-accent-hover) !important;
   box-shadow: 0 0 14px var(--nvt-accent-glow) !important;
   outline: none !important;
 }
 
-/* Search typeahead dropdown list */
-.nvt-modern-ui .typeahead__list {
+/* Typeahead — base styles. theme.js reparents open lists onto <body> with
+   position:fixed + max z-index so the hero stacking context can't cover them. */
+html.nvt-modern-ui .typeahead__container,
+html.nvt-modern-ui .typeahead__field,
+html.nvt-modern-ui .typeahead__query,
+html.nvt-modern-ui .app-search .typeahead__container {
+  overflow: visible !important;
+  position: relative !important;
+  z-index: 3001 !important;
+}
+
+html.nvt-modern-ui .typeahead__list,
+html.nvt-modern-ui .typeahead__dropdown,
+html.nvt-modern-ui .app .app-search .typeahead__list,
+html.nvt-modern-ui .header-search-fixed .typeahead__list,
+html.nvt-modern-ui .header-search .typeahead__list,
+html.nvt-modern-ui body > .typeahead__list,
+html.nvt-modern-ui body > .nvt-typeahead-float,
+.nvt-modern-ui .typeahead__list,
+body > .nvt-typeahead-float {
   background: var(--nvt-bg-elevated) !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   border-radius: 12px !important;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7) !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75) !important;
+  color: var(--nvt-text) !important;
+  padding: 8px 0 12px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  /* JS sets fixed top/left/width/z-index; these are fallbacks */
+  z-index: 2147483000 !important;
+}
+
+html.nvt-modern-ui .typeahead__list > li,
+html.nvt-modern-ui .typeahead__list .typeahead__item,
+body > .nvt-typeahead-float > li {
+  overflow: visible !important;
+}
+
+html.nvt-modern-ui .typeahead__list .typeahead__item > a,
+html.nvt-modern-ui .app .app-search .typeahead__list a,
+body > .nvt-typeahead-float a {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 10px 14px !important;
+  color: #f1f5f9 !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  line-height: 1.35 !important;
+}
+
+html.nvt-modern-ui .typeahead__list .caption,
+html.nvt-modern-ui .typeahead__list .title,
+html.nvt-modern-ui .typeahead__list .name,
+html.nvt-modern-ui .app .app-search .typeahead__list a .caption,
+body > .nvt-typeahead-float .caption {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  display: block !important;
+  max-width: none !important;
+  width: auto !important;
+  flex: 1 1 auto !important;
+  color: #f1f5f9 !important;
+  font-size: 13px !important;
+  line-height: 1.35 !important;
+  -webkit-line-clamp: unset !important;
+}
+
+html.nvt-modern-ui .typeahead__list .media,
+html.nvt-modern-ui .app .app-search .typeahead__list .media,
+body > .nvt-typeahead-float .media {
+  flex: 0 0 48px !important;
+  width: 48px !important;
+  max-width: 48px !important;
+  min-width: 48px !important;
+  height: 48px !important;
+  border-radius: 6px !important;
+  overflow: hidden !important;
+}
+
+/* Hide promo/ad tiles that inject into typeahead (e.g. Audible) */
+html.nvt-modern-ui .typeahead__list a[href*="audible"],
+html.nvt-modern-ui .typeahead__list a[href*="amazon"],
+html.nvt-modern-ui .typeahead__list [class*="ad-"],
+html.nvt-modern-ui .typeahead__list .sponsored,
+body > .nvt-typeahead-float a[href*="audible"] {
+  display: none !important;
+}
+
+/* Hero must stay in a low stacking context so it never paints over search */
+html.nvt-modern-ui .app-slider,
+html.nvt-modern-ui .slider-app,
+html.nvt-modern-ui .home-slider,
+html.nvt-modern-ui .slide.media.media-slide,
+html.nvt-modern-ui a.slide.media.media-slide {
+  z-index: 0 !important;
+  isolation: isolate !important;
+  position: relative !important;
 }
 
 /* 3. Section Headings (.app-heading & .text) */
@@ -108,25 +386,47 @@ html.nvt-modern-ui,
   box-shadow: 0 0 10px var(--nvt-accent-glow) !important;
 }
 
-/* 4. Movie & TV Show Card Grids (.list-movie, .list-media, .media-cover) */
+/* 4. Movie & TV Show Card Grids (.list-movie, .list-media, .media-cover)
+
+   IMPORTANT: never set content/display:none on .media::before/::after —
+   nepu uses .media:after { padding-top } for poster aspect-ratio; killing it
+   collapses covers.
+
+   Hover: raised lift + soft drop shadow (ours). Site’s flat rgba(0,0,0,.85)
+   scrim on .list-media-attr:before is replaced by our gradient darken. */
+
+/* Room for lift + shadow in horizontal rails (overflow clips otherwise). */
+.nvt-modern-ui .row.list-scrollable {
+  padding: 12px 4px 28px !important;
+}
+
 .nvt-modern-ui .list-movie {
   border-radius: 10px !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   background: var(--nvt-bg-elevated) !important;
   border: 1px solid var(--nvt-border) !important;
   padding: 0 !important;
-  box-shadow: none !important;
-  transform: none !important;
-  transition: border-color 0.2s ease !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+  outline: none !important;
+  transform: translateY(0) scale(1) !important;
+  transition:
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.22s ease,
+    border-color 0.22s ease !important;
+  will-change: transform;
 }
 
 .nvt-modern-ui .list-movie:hover {
   border-color: var(--nvt-border-hover) !important;
-  box-shadow: none !important;
-  transform: none !important;
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(59, 130, 246, 0.2) !important;
+  transform: translateY(-6px) scale(1.03) !important;
+  z-index: 20 !important;
 }
 
-.nvt-modern-ui .list-media {
+.nvt-modern-ui .list-media,
+.nvt-modern-ui a.list-media {
   position: relative !important;
   border-radius: 8px !important;
   overflow: hidden !important;
@@ -136,70 +436,168 @@ html.nvt-modern-ui,
 .nvt-modern-ui .media.media-cover,
 .nvt-modern-ui .media.media-episode {
   border-radius: 8px !important;
+  transition: transform 0.25s ease !important;
 }
 
-/* Quality Tag & IMDb Score Overlay Badges */
+/* Subtle poster zoom inside the clipped media frame (raised feel). */
+.nvt-modern-ui .list-movie:hover .media.media-cover,
+.nvt-modern-ui .list-movie:hover .media.media-episode {
+  transform: scale(1.05) !important;
+}
+
+/* .media aspect-ratio pseudos: never touch content/display/opacity/padding. */
+.nvt-modern-ui .media.media-cover::before,
+.nvt-modern-ui .media.media-cover::after,
+.nvt-modern-ui .media.media-episode::before,
+.nvt-modern-ui .media.media-episode::after {
+  box-shadow: none !important;
+  filter: none !important;
+  outline: none !important;
+}
+
+/* Badge host: full-bleed so our ::before darken covers the poster.
+   Site positions .quality / .imdb absolutely inside this layer. */
 .nvt-modern-ui .list-media-attr {
   position: absolute !important;
-  top: 6px !important;
-  left: 6px !important;
-  right: 6px !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  padding: 10px !important;
   display: flex !important;
   justify-content: space-between !important;
-  align-items: center !important;
+  align-items: flex-end !important;
   pointer-events: none !important;
   z-index: 5 !important;
+  background: none !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
 }
 
-.nvt-modern-ui .quality {
-  background: rgba(11, 15, 25, 0.75) !important;
-  backdrop-filter: blur(4px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  border-radius: 4px !important;
-  font-size: 10px !important;
-  font-weight: 700 !important;
-  padding: 2px 6px !important;
-  color: #60a5fa !important;
+/* Our slide darken: soft cinematic gradient (not site’s flat 85% black).
+   Higher specificity beats site’s .list-movie:hover .list-media-attr:before
+   { opacity: 1 !important; background-color: rgba(0,0,0,.85) }. */
+html.nvt-modern-ui .list-movie .list-media .list-media-attr::before,
+html.nvt-modern-ui .list-movie:hover .list-media-attr::before,
+html.nvt-modern-ui .list-movie:hover .list-media .list-media-attr::before,
+.nvt-modern-ui .list-media-attr::before,
+.nvt-modern-ui .list-movie:hover .list-media-attr::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 0 !important;
+  border-radius: 8px !important;
+  pointer-events: none !important;
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  filter: none !important;
+  background-color: transparent !important;
+  background-image: linear-gradient(
+    to top,
+    rgba(8, 12, 20, 0.78) 0%,
+    rgba(8, 12, 20, 0.35) 38%,
+    rgba(8, 12, 20, 0.08) 62%,
+    transparent 100%
+  ) !important;
+  opacity: 0 !important;
+  transition: opacity 0.22s ease !important;
 }
 
-.nvt-modern-ui .imdb {
-  background: rgba(11, 15, 25, 0.75) !important;
-  backdrop-filter: blur(4px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  border-radius: 4px !important;
-  font-size: 10px !important;
-  font-weight: 700 !important;
-  padding: 2px 6px !important;
-  color: #fbbf24 !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 3px !important;
+html.nvt-modern-ui .list-movie:hover .list-media-attr::before,
+html.nvt-modern-ui .list-movie:hover .list-media .list-media-attr::before,
+.nvt-modern-ui .list-movie:hover .list-media-attr::before {
+  opacity: 1 !important;
 }
 
-.nvt-modern-ui .imdb svg {
+/* Full HD / quality tag — hide on poster cards (user preference). */
+.nvt-modern-ui .list-movie .quality,
+.nvt-modern-ui .list-media .quality,
+.nvt-modern-ui .list-media-attr .quality {
   display: none !important;
 }
 
-.nvt-modern-ui .imdb::before {
-  content: "★" !important;
-  font-size: 10px !important;
+/* Rating badge: site uses fixed 36×36 + absolute right:0 which clips/overflows
+   once we swap the SVG ring for ★ text. Pin bottom-right with inset padding. */
+.nvt-modern-ui .list-movie .list-media-attr .imdb,
+.nvt-modern-ui .list-media-attr .imdb,
+.nvt-modern-ui .imdb {
+  position: absolute !important;
+  right: 8px !important;
+  bottom: 8px !important;
+  left: auto !important;
+  top: auto !important;
+  z-index: 2 !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  max-width: calc(100% - 16px) !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  background: rgba(11, 15, 25, 0.82) !important;
+  backdrop-filter: blur(4px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  padding: 3px 7px !important;
+  color: #fbbf24 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
 }
 
-/* Play button hover overlay */
+.nvt-modern-ui .list-media-attr .imdb svg,
+.nvt-modern-ui .imdb svg {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: static !important;
+  inset: auto !important;
+}
+
+.nvt-modern-ui .list-media-attr .imdb::before,
+.nvt-modern-ui .imdb::before {
+  content: "★" !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+  flex-shrink: 0 !important;
+}
+
+/* Play button: soft accent glow on hover (not a full-card wash). */
 .nvt-modern-ui .play-btn {
-  background: rgba(37, 99, 235, 0.85) !important;
+  background: rgba(37, 99, 235, 0.9) !important;
   border-radius: 50% !important;
   width: 44px !important;
   height: 44px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 0 0 transparent !important;
+  outline: none !important;
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease !important;
 }
 
-.nvt-modern-ui .list-movie:hover .play-btn {
-  transform: translate(-50%, -50%) !important;
+.nvt-modern-ui .list-movie:hover .play-btn,
+.nvt-modern-ui .list-media:hover .play-btn,
+.nvt-modern-ui a.list-media:hover .play-btn {
+  transform: translate(-50%, -50%) scale(1.08) !important;
   background: var(--nvt-accent) !important;
+  box-shadow: 0 0 22px var(--nvt-accent-glow) !important;
 }
 
 /* Caption / Title below poster */
@@ -282,15 +680,34 @@ html.nvt-modern-ui,
    safely override `background-image` directly without losing it; a
    pseudo-element scrim layered on top handles the darkening/readability
    gradient instead. ========================================================================== */
-.nvt-modern-ui .slide.media.media-slide {
-  border-radius: 14px !important;
+/* Hero height: site uses .media-slide:after { padding-top: 45% } which is
+   huge on wide screens. Shrink aspect + type so the banner isn't a wall. */
+.nvt-modern-ui .app-slider,
+.nvt-modern-ui .slider-app,
+.nvt-modern-ui .home-slider {
+  max-height: min(340px, 38vh) !important;
+}
+
+.nvt-modern-ui .slide.media.media-slide,
+.nvt-modern-ui a.slide.media.media-slide {
+  border-radius: 12px !important;
   overflow: hidden !important;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45) !important;
   transition: background-size 0.6s ease !important;
+  max-height: min(340px, 38vh) !important;
+  min-height: 0 !important;
+  background-position: center center !important;
+}
+
+/* Aspect-ratio pseudo: was 45% (~cinema banner). Aim ~16:6-ish. */
+.nvt-modern-ui .slide.media.media-slide::after,
+.nvt-modern-ui .media.media-slide::after {
+  padding-top: 28% !important;
+  max-height: min(340px, 38vh) !important;
 }
 
 .nvt-modern-ui .slide.media.media-slide:hover {
-  background-size: 108% !important;
+  background-size: 106% !important;
 }
 
 .nvt-modern-ui .slide.media.media-slide::before {
@@ -305,38 +722,41 @@ html.nvt-modern-ui,
 .nvt-modern-ui .slide-caption {
   position: relative !important;
   z-index: 2 !important;
-  padding: 32px !important;
+  padding: 16px 22px !important;
+  max-width: 72% !important;
 }
 
 .nvt-modern-ui .slide-caption .title {
-  font-size: 32px !important;
+  font-size: 22px !important;
   font-weight: 800 !important;
   color: #ffffff !important;
   text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6) !important;
-  margin-bottom: 12px !important;
+  margin-bottom: 8px !important;
   line-height: 1.2 !important;
+  max-height: none !important;
+  -webkit-line-clamp: 2 !important;
 }
 
 .nvt-modern-ui .slide-header {
   display: flex !important;
   align-items: center !important;
-  gap: 10px !important;
+  gap: 8px !important;
   flex-wrap: wrap !important;
-  margin-bottom: 14px !important;
+  margin-bottom: 8px !important;
 }
 
 .nvt-modern-ui .slide-header > div {
   color: var(--nvt-text-dim) !important;
-  font-size: 13px !important;
+  font-size: 12px !important;
 }
 
 .nvt-modern-ui .slide-header .imdb {
   background: rgba(251, 191, 36, 0.15) !important;
   border: 1px solid rgba(251, 191, 36, 0.4) !important;
   color: #fbbf24 !important;
-  padding: 3px 10px !important;
+  padding: 2px 8px !important;
   border-radius: 6px !important;
-  font-size: 12px !important;
+  font-size: 11px !important;
   font-weight: 700 !important;
 }
 
@@ -352,25 +772,43 @@ html.nvt-modern-ui,
   background: rgba(37, 99, 235, 0.2) !important;
   border: 1px solid rgba(37, 99, 235, 0.4) !important;
   color: #60a5fa !important;
-  padding: 3px 10px !important;
+  padding: 2px 8px !important;
   border-radius: 6px !important;
   font-weight: 600 !important;
+  font-size: 11px !important;
 }
 
 .nvt-modern-ui .slide-header .quality {
   background: rgba(96, 165, 250, 0.15) !important;
   border: 1px solid rgba(96, 165, 250, 0.4) !important;
   color: #60a5fa !important;
-  padding: 3px 10px !important;
+  padding: 2px 8px !important;
   border-radius: 6px !important;
   font-weight: 700 !important;
-  font-size: 11px !important;
+  font-size: 10px !important;
 }
 
 .nvt-modern-ui .slide-caption .description {
   color: var(--nvt-text-dim) !important;
-  font-size: 14px !important;
-  line-height: 1.6 !important;
-  max-width: 560px !important;
-  margin-top: 8px !important;
+  font-size: 12.5px !important;
+  line-height: 1.45 !important;
+  max-width: 480px !important;
+  margin-top: 4px !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
+@media (max-width: 900px) {
+  .nvt-modern-ui .slide.media.media-slide::after,
+  .nvt-modern-ui .media.media-slide::after {
+    padding-top: 36% !important;
+  }
+  .nvt-modern-ui .slide-caption .title {
+    font-size: 18px !important;
+  }
+  .nvt-modern-ui .slide-caption .description {
+    -webkit-line-clamp: 1 !important;
+  }
 }

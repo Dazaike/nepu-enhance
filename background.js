@@ -239,7 +239,7 @@ async function checkNewReleases(force) {
         const hadNewReleaseBefore = !!item.hasNewRelease;
         const hasNewRelease = isNewer && hasAired;
 
-        if (hasNewRelease || hadNewRelease !== hasNewRelease) {
+        if (hasNewRelease || hadNewReleaseBefore !== hasNewRelease) {
           const updated = {
             ...item,
             hasNewRelease,
@@ -328,7 +328,9 @@ chrome.notifications.onClicked.addListener(async (notifId) => {
 async function maybeInitialRecommendationsFetch() {
   try {
     const rec = await NVT.getRecommendations();
-    if (!rec.updatedAt) fetchRecommendations(false);
+    // First install, or upgrade from the old single-rail cache shape.
+    const needsRails = !rec.updatedAt || !Array.isArray(rec.rails) || !rec.rails.length;
+    if (needsRails) fetchRecommendations(false);
   } catch (err) {
     console.warn('[Nepu background] initial recommendations fetch check failed:', err);
   }
@@ -347,18 +349,67 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. Recommendations Engine ("Recommended For You" homepage rail)
+// 3. Discovery + Recommendations rails (multi-row homepage)
 // ---------------------------------------------------------------------------
-// nepu's own catalog is fine but its recommendations are weak. TMDB (the
-// same API already used for release tracking and subtitle matching above)
-// has a real recommendations graph. This mirrors the release-tracking
-// pattern exactly: background.js refreshes a cache on an alarm, and
-// content/home-rails.js just does a fast local read of that cache to
-// render the rail — no network calls at page-render time.
+// Multi-rail discovery powered by TMDB (same API we already use): Now Playing,
+// Trending Movies/TV, Popular TV, Anime, genres, plus a personalized
+// "Because you watched …" row when we can seed it from Continue Watching /
+// Watchlist.
 //
-// Recommendation cards have no direct nepu.is URL (TMDB IDs don't map to
-// nepu's internal catalog IDs), so home-rails.js instead submits nepu's
-// own live search form for the title when a card is clicked.
+// background.js refreshes a rails cache on an alarm; content/home-rails.js
+// does a fast local read (Continue Watching + Watchlist first, then these
+// discovery rails). Cards open nepu search for the title (TMDB IDs ≠ nepu IDs).
+
+const DISCOVERY_RAIL_DEFS = [
+  { id: 'now-playing', title: 'Now Playing', path: '/movie/now_playing', mediaType: 'movie' },
+  { id: 'trending-movies', title: 'Trending Movies', path: '/trending/movie/week', mediaType: 'movie' },
+  { id: 'trending-tv', title: 'Trending TV', path: '/trending/tv/week', mediaType: 'tv' },
+  { id: 'popular-tv', title: 'Popular TV Shows', path: '/tv/popular', mediaType: 'tv' },
+  {
+    id: 'anime',
+    title: 'Anime Spotlight',
+    path: '/discover/tv',
+    mediaType: 'tv',
+    query: { with_genres: '16', with_original_language: 'ja', sort_by: 'popularity.desc' },
+  },
+  {
+    id: 'action',
+    title: 'Action Movies',
+    path: '/discover/movie',
+    mediaType: 'movie',
+    query: { with_genres: '28', sort_by: 'popularity.desc' },
+  },
+  {
+    id: 'comedy',
+    title: 'Comedy Movies',
+    path: '/discover/movie',
+    mediaType: 'movie',
+    query: { with_genres: '35', sort_by: 'popularity.desc' },
+  },
+  {
+    id: 'horror',
+    title: 'Scary Movies',
+    path: '/discover/movie',
+    mediaType: 'movie',
+    query: { with_genres: '27', sort_by: 'popularity.desc' },
+  },
+  {
+    id: 'korean',
+    title: 'Korean Movies',
+    path: '/discover/movie',
+    mediaType: 'movie',
+    query: { with_original_language: 'ko', sort_by: 'popularity.desc' },
+  },
+  {
+    id: 'romance',
+    title: 'Romance Movies',
+    path: '/discover/movie',
+    mediaType: 'movie',
+    query: { with_genres: '10749', sort_by: 'popularity.desc' },
+  },
+];
+
+const RAIL_ITEM_LIMIT = 14;
 
 function cleanTitleForTmdbSearch(title) {
   return String(title || '')
@@ -380,14 +431,64 @@ async function resolveTmdbSeed(item, apiKey) {
 
 function mapTmdbRecommendation(raw, fallbackMediaType) {
   if (!raw || !raw.poster_path) return null;
-  const mediaType = raw.media_type || fallbackMediaType;
+  const mediaType = raw.media_type || fallbackMediaType || 'movie';
+  if (mediaType !== 'movie' && mediaType !== 'tv') return null;
+  const dateStr = raw.release_date || raw.first_air_date || '';
+  const year = dateStr ? parseInt(dateStr.slice(0, 4), 10) : null;
   return {
     id: `${mediaType}-${raw.id}`,
+    tmdbId: raw.id,
     title: raw.title || raw.name || 'Untitled',
     poster: `https://image.tmdb.org/t/p/w342${raw.poster_path}`,
     mediaType,
     rating: typeof raw.vote_average === 'number' ? Math.round(raw.vote_average * 10) / 10 : null,
+    year: year && year > 1900 ? year : null,
   };
+}
+
+async function fetchTmdbList(path, query, mediaType, apiKey, excludeIds) {
+  const data = await tmdbFetch(path, query || {}, apiKey);
+  const results = (data && data.results) || [];
+  const out = [];
+  for (const r of results) {
+    const mapped = mapTmdbRecommendation(r, mediaType || r.media_type);
+    if (!mapped) continue;
+    if (excludeIds && excludeIds.has(mapped.id)) continue;
+    out.push(mapped);
+    if (out.length >= RAIL_ITEM_LIMIT) break;
+  }
+  return out;
+}
+
+async function fetchPersonalizedRail(watchlist, history, apiKey, excludeIds) {
+  const seedCandidates = [
+    ...watchlist.slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)),
+    ...history.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
+  ].filter((item) => item && item.title);
+
+  for (const seed of seedCandidates.slice(0, 8)) {
+    try {
+      const resolved = await resolveTmdbSeed(seed, apiKey);
+      if (!resolved) continue;
+      const items = await fetchTmdbList(
+        `/${resolved.mediaType}/${resolved.id}/recommendations`,
+        {},
+        resolved.mediaType,
+        apiKey,
+        excludeIds
+      );
+      if (items.length) {
+        return {
+          id: 'because-you',
+          title: `Because you watched ${seed.title}`,
+          items,
+        };
+      }
+    } catch (seedErr) {
+      console.warn('[Nepu background] recommendation seed failed:', seed.title, seedErr);
+    }
+  }
+  return null;
 }
 
 async function fetchRecommendations(force) {
@@ -408,50 +509,54 @@ async function fetchRecommendations(force) {
     await NVT.setRecommendations({ checking: true });
 
     const [watchlist, history] = await Promise.all([NVT.listWatchlist(), NVT.listHistory()]);
-    const seedCandidates = [
-      ...watchlist.slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)),
-      ...history.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
-    ].filter((item) => item && item.title);
 
-    let items = [];
-    let reason = 'Trending Now';
-
-    for (const seed of seedCandidates) {
-      try {
-        const resolved = await resolveTmdbSeed(seed, apiKey);
-        if (!resolved) continue;
-        const recData = await tmdbFetch(`/${resolved.mediaType}/${resolved.id}/recommendations`, {}, apiKey);
-        const results = (recData && recData.results) || [];
-        const mapped = results.map((r) => mapTmdbRecommendation(r, resolved.mediaType)).filter(Boolean);
-        if (mapped.length) {
-          items = mapped.slice(0, 12);
-          reason = `Because you watched ${seed.title}`;
-          break;
-        }
-      } catch (seedErr) {
-        console.warn('[Nepu background] recommendation seed failed:', seed.title, seedErr);
+    // Prefer not to re-surface titles already on the user's rails.
+    const excludeIds = new Set();
+    for (const item of [...watchlist, ...history]) {
+      if (!item) continue;
+      if (item.tmdbId) {
+        const mt = item.mediaType === 'tv' ? 'tv' : 'movie';
+        excludeIds.add(`${mt}-${item.tmdbId}`);
       }
     }
 
-    if (!items.length) {
-      const trending = await tmdbFetch('/trending/all/week', {}, apiKey);
-      const results = (trending && trending.results) || [];
-      items = results
-        .filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
-        .map((r) => mapTmdbRecommendation(r, r.media_type))
-        .filter(Boolean)
-        .slice(0, 12);
-      reason = 'Trending Now';
+    const rails = [];
+
+    const personal = await fetchPersonalizedRail(watchlist, history, apiKey, excludeIds);
+    if (personal) {
+      rails.push(personal);
+      for (const it of personal.items) excludeIds.add(it.id);
     }
+
+    // Discovery rows — fetch in parallel (one burst per refresh).
+    const discoveryResults = await Promise.all(
+      DISCOVERY_RAIL_DEFS.map(async (def) => {
+        try {
+          const items = await fetchTmdbList(def.path, def.query || {}, def.mediaType, apiKey, excludeIds);
+          return items.length ? { id: def.id, title: def.title, items } : null;
+        } catch (err) {
+          console.warn('[Nepu background] discovery rail failed:', def.id, err);
+          return null;
+        }
+      })
+    );
+    for (const rail of discoveryResults) {
+      if (rail) rails.push(rail);
+    }
+
+    // Back-compat single-rail fields (options UI + older code paths).
+    const primary = rails[0] || { title: 'Trending Now', items: [] };
+    const itemCount = rails.reduce((n, r) => n + (r.items ? r.items.length : 0), 0);
 
     await NVT.setRecommendations({
       checking: false,
-      items,
-      reason,
+      items: primary.items || [],
+      reason: primary.title || 'Recommended For You',
+      rails,
       updatedAt: Date.now(),
       lastError: '',
     });
-    return { ok: true, count: items.length };
+    return { ok: true, count: itemCount, rails: rails.length };
   } catch (err) {
     const msg = String((err && err.message) || err);
     await NVT.setRecommendations({ checking: false, lastError: msg });

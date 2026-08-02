@@ -345,6 +345,28 @@ body {
   color: #042f2e;
   font-weight: 700;
   box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  z-index: 2;
+}
+
+.grid-badge.new-release:hover {
+  background: #34d399;
+  filter: brightness(1.05);
+}
+
+.icon-btn.clear-new-btn {
+  color: #042f2e;
+  background: #10b981;
+  border-color: #059669;
+  font-weight: 700;
+}
+
+.icon-btn.clear-new-btn:hover {
+  background: #34d399;
+  border-color: #10b981;
+  color: #042f2e;
 }
 
 .grid-overlay {

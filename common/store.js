@@ -167,6 +167,28 @@ const NVT = (() => {
     return entry;
   }
 
+  /**
+   * Clear the "NEW Sx Ey" badge: mark the user caught up to the latest
+   * known episode (or simply drop the flag if we never stored latest S/E).
+   */
+  async function clearNewReleaseBadge(id) {
+    if (!id) return null;
+    const key = WL_PREFIX + id;
+    const existing = (await chrome.storage.local.get(key))[key] || null;
+    if (!existing || existing.deleted) return null;
+    const latestS = existing.latestSeason != null ? Number(existing.latestSeason) : null;
+    const latestE = existing.latestEpisode != null ? Number(existing.latestEpisode) : null;
+    const next = {
+      ...existing,
+      hasNewRelease: false,
+      updatedAt: Date.now(),
+    };
+    if (latestS != null && !Number.isNaN(latestS)) next.season = latestS;
+    if (latestE != null && !Number.isNaN(latestE)) next.episode = latestE;
+    await chrome.storage.local.set({ [key]: next });
+    return next;
+  }
+
   async function removeWatchlist(id) {
     const key = WL_PREFIX + id;
     const existing = (await chrome.storage.local.get(key))[key] || null;
@@ -311,13 +333,14 @@ const NVT = (() => {
     return next;
   }
 
-  /** TMDB-powered "Recommended For You" cache — refreshed periodically by
-   * background.js (mirrors the release-tracking status pattern) so the
-   * homepage rail render stays a fast local read, never a network call. */
+  /** TMDB-powered discovery rails cache (multi-row rows + personalized
+   * "Because you watched …"). Refreshed by background.js so the homepage
+   * rail render stays a fast local read, never a network call. */
   async function getRecommendations() {
     const res = await chrome.storage.local.get(RECOMMENDATIONS_KEY);
     return {
       items: [],
+      rails: [],
       updatedAt: 0,
       reason: '',
       checking: false,
@@ -352,6 +375,7 @@ const NVT = (() => {
     clearHistory,
     addWatchlist,
     putWatchlistRaw,
+    clearNewReleaseBadge,
     removeWatchlist,
     listWatchlist,
     clearWatchlist,

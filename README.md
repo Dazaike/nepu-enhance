@@ -89,6 +89,10 @@ desktop notifications when a new episode airs.
   (configurable to 6, 12, or 24 hours).
 - **Visual badges:** Cards with un-watched released episodes show a prominent
   `NEW S3 E9` badge in the popup and on the homepage Watchlist rail.
+- **Clear NEW / mark caught up:** In the popup, click the green **✓** (list
+  view) or the **NEW** badge itself (grid view). On the homepage Watchlist
+  rail, click the green NEW badge. That sets progress to the latest known
+  episode and drops `hasNewRelease`.
 - **Per-show opt-out:** Enable/disable release tracking for specific shows
   on the options page.
 - **Test notification button:** Click **Send test notification** on the options
