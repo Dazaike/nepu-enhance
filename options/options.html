@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nepu Watch Tracker & Subtitles — Options</title>
+<link rel="stylesheet" href="../popup/popup.css" />
+<link rel="stylesheet" href="options.css" />
+</head>
+<body class="options-body">
+<div class="options-page">
+  <header class="options-header">
+    <div class="brand"><span class="brand-dot"></span>Nepu Watch Tracker &amp; Subtitles</div>
+    <p class="options-lede">
+      This extension has two features: general watch-tracking (Continue Watching &amp; Watchlist,
+      configurable below and in the popup) and an OpenSubtitles/TMDB caption picker on nepu.to.
+    </p>
+  </header>
+
+  <section class="options-card">
+    <h2>OpenSubtitles &amp; TMDB API keys</h2>
+    <p class="muted">
+      Used by the subtitle picker (CC button, or Alt+S) on nepu.to / nepu.is / nepu.net.
+      Saved once here, shared across all three mirrors.
+    </p>
+    <div class="settings-list">
+      <div class="setting-row column">
+        <label for="os-key-input">OpenSubtitles API key</label>
+        <input type="text" id="os-key-input" placeholder="Paste OS key…" autocomplete="off" spellcheck="false" />
+        <div class="tag-input-row">
+          <button type="button" id="os-key-save-btn" class="btn btn-primary btn-sm">Save OS key</button>
+          <a href="https://www.opensubtitles.com/consumers" target="_blank" rel="noreferrer" class="btn btn-link btn-sm">Get OS key</a>
+        </div>
+      </div>
+      <div class="setting-row column">
+        <label for="tmdb-key-input">TMDB API key</label>
+        <input type="text" id="tmdb-key-input" placeholder="Paste TMDB v3 key…" autocomplete="off" spellcheck="false" />
+        <div class="tag-input-row">
+          <button type="button" id="tmdb-key-save-btn" class="btn btn-primary btn-sm">Save TMDB key</button>
+          <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer" class="btn btn-link btn-sm">Get TMDB key</a>
+        </div>
+      </div>
+      <div id="sub-auth-status" class="muted"></div>
+    </div>
+  </section>
+
+  <section class="options-card">
+    <h2>Watch tracking settings</h2>
+    <div class="settings-list">
+      <div class="setting-row">
+        <label class="switch-label" for="track-toggle">Track video playback</label>
+        <label class="switch">
+          <input type="checkbox" id="track-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <label class="switch-label" for="resume-toggle">Auto-resume playback position</label>
+        <label class="switch">
+          <input type="checkbox" id="resume-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <label class="switch-label" for="autoapply-toggle">Auto-apply captions on Nepu</label>
+        <label class="switch">
+          <input type="checkbox" id="autoapply-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <label class="switch-label" for="usetime-toggle">Show time instead of percentage</label>
+        <label class="switch">
+          <input type="checkbox" id="usetime-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row column">
+        <label for="min-duration-input">Minimum video length to track (seconds)</label>
+        <input type="number" id="min-duration-input" min="0" step="1" />
+      </div>
+      <div class="setting-row column">
+        <label for="completed-range">Mark watched at <span id="completed-value">92</span>%</label>
+        <input type="range" id="completed-range" min="0" max="100" step="1" />
+      </div>
+    </div>
+  </section>
+
+  <section class="options-card danger-zone">
+    <h2>Danger zone</h2>
+    <p class="muted">These actions cannot be undone.</p>
+    <div class="danger-actions">
+      <button type="button" id="clear-history-btn" class="btn btn-danger">Clear all watch history</button>
+      <button type="button" id="clear-watchlist-btn" class="btn btn-danger">Clear watchlist</button>
+    </div>
+  </section>
+</div>
+<script src="../common/store.js"></script>
+<script src="options.js"></script>
+</body>
+</html>

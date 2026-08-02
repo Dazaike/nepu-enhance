@@ -1,0 +1,61 @@
+.options-body {
+  width: auto;
+  min-height: 100vh;
+  padding: 40px 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.options-page {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.options-header .brand {
+  font-size: 18px;
+}
+
+.options-lede {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin: 10px 0 0;
+  line-height: 1.6;
+}
+
+.options-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 22px;
+}
+
+.options-card h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.options-card .muted {
+  color: var(--text-dim);
+  font-size: 12.5px;
+  line-height: 1.6;
+  margin: 0 0 4px;
+}
+
+.options-card .muted:last-child {
+  margin-bottom: 0;
+}
+
+.danger-zone {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.danger-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}

@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Nepu Watch Tracker & Subtitles",
+  "version": "1.0.0",
+  "description": "Continue Watching, a Watchlist, and OpenSubtitles captions for Nepu (nepu.to / nepu.is / nepu.net).",
+  "permissions": ["storage", "scripting", "activeTab", "tabs"],
+  "host_permissions": [
+    "https://api.opensubtitles.com/*",
+    "https://*.opensubtitles.com/*",
+    "https://api.themoviedb.org/*",
+    "https://*.themoviedb.org/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Continue Watching & Watchlist",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "options/options.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://nepu.to/*", "https://www.nepu.to/*",
+        "https://nepu.is/*", "https://www.nepu.is/*",
+        "https://nepu.net/*", "https://www.nepu.net/*"
+      ],
+      "js": ["common/store.js", "common/nepu-title.js", "content/tracker.js", "content/subtitles.js", "content/home-rails.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}

@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nepu Watch Tracker</title>
+<link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="brand"><span class="brand-dot"></span>Nepu Watch Tracker</div>
+  </header>
+
+  <nav class="tabs">
+    <button type="button" class="tab-btn active" data-tab="continue">Continue Watching</button>
+    <button type="button" class="tab-btn" data-tab="watchlist">Watchlist</button>
+    <button type="button" class="tab-btn" data-tab="subtitles">Subtitles</button>
+    <button type="button" class="tab-btn" data-tab="settings">Settings</button>
+  </nav>
+
+  <section class="panel active" id="panel-continue">
+    <div class="panel-header">
+      <span class="panel-title">Continue Watching</span>
+      <div class="header-actions">
+        <div class="view-toggle" id="continue-view-toggle">
+          <button type="button" class="view-btn" data-view="list" title="List view">&#9776;</button>
+          <button type="button" class="view-btn" data-view="grid" title="Grid view">&#9638;</button>
+        </div>
+        <button type="button" id="clear-history-btn" class="btn btn-ghost btn-sm">Clear all</button>
+      </div>
+    </div>
+    <div id="continue-list" class="list"></div>
+  </section>
+
+  <section class="panel" id="panel-watchlist">
+    <div class="panel-header">
+      <span class="panel-title">Watchlist</span>
+      <div class="header-actions">
+        <div class="view-toggle" id="watchlist-view-toggle">
+          <button type="button" class="view-btn" data-view="list" title="List view">&#9776;</button>
+          <button type="button" class="view-btn" data-view="grid" title="Grid view">&#9638;</button>
+        </div>
+        <button type="button" id="add-current-tab-btn" class="btn btn-primary btn-sm">+ Add tab</button>
+      </div>
+    </div>
+    <div id="watchlist-error" class="inline-error" hidden></div>
+    <div id="watchlist-list" class="list"></div>
+  </section>
+
+  <section class="panel" id="panel-subtitles">
+    <div class="panel-header">
+      <span class="panel-title">Subtitles</span>
+    </div>
+    <div id="subtitles-not-nepu" class="sub-not-nepu">
+      &#127916; Open a Nepu video page (nepu.to / nepu.is / nepu.net) to use subtitles.
+    </div>
+    <div id="subtitles-body" hidden>
+      <nav class="subtabs">
+        <button type="button" class="subtab-btn active" data-subtab="search">Search</button>
+        <button type="button" class="subtab-btn" data-subtab="style">Style</button>
+      </nav>
+      <div id="sub-status" class="status" data-kind="info"></div>
+
+      <div class="subpanel active" id="subpanel-search">
+        <label class="field">Title
+          <input type="text" id="sub-query" placeholder="Show or movie…" autocomplete="off" />
+        </label>
+        <div class="field-row">
+          <label class="field small">S
+            <input type="number" id="sub-season" min="0" max="99" placeholder="—" />
+          </label>
+          <label class="field small">E
+            <input type="number" id="sub-episode" min="0" max="999" placeholder="—" />
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">IMDb
+            <input type="text" id="sub-imdb" placeholder="tt…" autocomplete="off" />
+          </label>
+          <label class="field">TMDB id
+            <input type="text" id="sub-tmdbid" placeholder="optional" autocomplete="off" />
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">Lang
+            <select id="sub-lang">
+              <option value="en">en</option>
+              <option value="es">es</option>
+              <option value="fr">fr</option>
+              <option value="de">de</option>
+              <option value="pt">pt</option>
+              <option value="it">it</option>
+              <option value="ru">ru</option>
+              <option value="ja">ja</option>
+              <option value="ko">ko</option>
+              <option value="zh">zh</option>
+              <option value="ar">ar</option>
+              <option value="pl">pl</option>
+              <option value="tr">tr</option>
+              <option value="nl">nl</option>
+              <option value="sv">sv</option>
+            </select>
+          </label>
+          <label class="field">HI
+            <select id="sub-hi">
+              <option value="all">All</option>
+              <option value="hi">HI</option>
+              <option value="nonhi">No HI</option>
+            </select>
+          </label>
+        </div>
+        <label class="checkbox-row"><input type="checkbox" id="sub-remember" checked /> Remember this pick</label>
+        <div class="toolbar">
+          <button type="button" id="sub-search-btn" class="btn btn-primary btn-sm">Search OS</button>
+          <button type="button" id="sub-tmdb-search-btn" class="btn btn-secondary btn-sm">TMDB</button>
+          <button type="button" id="sub-reload-last-btn" class="btn btn-ghost btn-sm">Reload last</button>
+        </div>
+        <div id="sub-tmdb-list" class="list sub-cand-list"></div>
+        <div id="sub-cand-list" class="list sub-cand-list"></div>
+        <label class="field">Timing offset
+          <div class="size-row">
+            <input type="range" id="sub-timing-offset" min="-10" max="10" step="0.1" value="0" />
+            <span class="size-val" id="sub-timing-val">0.00s</span>
+          </div>
+          <input type="number" id="sub-timing-offset-precise" step="0.1" value="0" hidden placeholder="seconds" />
+        </label>
+        <div class="toolbar">
+          <button type="button" id="sub-reset-timing-btn" class="btn btn-ghost btn-sm">Reset timing</button>
+          <label class="checkbox-row small"><input type="checkbox" id="sub-timing-precise" /> Precise</label>
+        </div>
+      </div>
+
+      <div class="subpanel" id="subpanel-style">
+        <label class="field">From bottom
+          <div class="size-row">
+            <input type="range" id="sub-style-bottompx" min="0" max="300" step="1" />
+            <span class="size-val" id="sub-style-bottompx-val">72px</span>
+          </div>
+        </label>
+        <label class="field">Horizontal
+          <div class="size-row">
+            <input type="range" id="sub-style-horizontal" min="0" max="100" step="1" />
+            <span class="size-val" id="sub-style-horizontal-val">50%</span>
+          </div>
+        </label>
+        <label class="field">Size
+          <div class="size-row">
+            <input type="range" id="sub-style-size" min="12" max="48" step="1" />
+            <span class="size-val" id="sub-style-size-val">24px</span>
+          </div>
+        </label>
+        <div class="field-row">
+          <label class="field">Color
+            <input type="color" id="sub-style-color" value="#ffffff" />
+          </label>
+          <label class="field">Font
+            <select id="sub-style-font">
+              <option value="Arial, Helvetica, sans-serif">Arial</option>
+              <option value="Helvetica, Arial, sans-serif">Helvetica</option>
+              <option value="Georgia, serif">Georgia</option>
+              <option value="'Times New Roman', Times, serif">Times</option>
+              <option value="Verdana, Geneva, sans-serif">Verdana</option>
+              <option value="Tahoma, Geneva, sans-serif">Tahoma</option>
+              <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+              <option value="'Courier New', Courier, monospace">Courier</option>
+              <option value="system-ui, sans-serif">System UI</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">Background
+          <select id="sub-style-bg">
+            <option value="box">Black box</option>
+            <option value="rounded">Rounded</option>
+            <option value="plate">Rounded + blur</option>
+            <option value="soft">Soft blur (no box)</option>
+          </select>
+        </label>
+        <label class="field" id="sub-style-opacity-wrap">
+          <span id="sub-style-opacity-title">Background opacity</span>
+          <div class="size-row">
+            <input type="range" id="sub-style-opacity" min="0" max="100" step="1" />
+            <span class="size-val" id="sub-style-opacity-val">72%</span>
+          </div>
+        </label>
+        <label class="field" id="sub-style-blur-wrap" hidden>
+          <span>Blur radius</span>
+          <div class="size-row">
+            <input type="range" id="sub-style-blur" min="2" max="48" step="1" />
+            <span class="size-val" id="sub-style-blur-val">16px</span>
+          </div>
+        </label>
+        <label class="field">Depth
+          <select id="sub-style-depth">
+            <option value="flat">Flat</option>
+            <option value="outline">Outline</option>
+            <option value="shadow">Drop shadow</option>
+            <option value="raised">Raised</option>
+            <option value="inset">Inset</option>
+          </select>
+        </label>
+        <div class="toolbar">
+          <button type="button" id="sub-cc-toggle-btn" class="btn btn-secondary btn-sm">CC on</button>
+          <button type="button" id="sub-reset-style-btn" class="btn btn-ghost btn-sm">Reset style</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <section class="panel" id="panel-settings">
+    <div class="panel-header">
+      <span class="panel-title">Settings</span>
+    </div>
+    <div class="settings-list">
+      <div class="setting-row">
+        <label class="switch-label" for="track-toggle">Track video playback</label>
+        <label class="switch">
+          <input type="checkbox" id="track-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <label class="switch-label" for="resume-toggle">Auto-resume playback position</label>
+        <label class="switch">
+          <input type="checkbox" id="resume-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <label class="switch-label" for="autoapply-toggle">Auto-apply captions on Nepu</label>
+        <label class="switch">
+          <input type="checkbox" id="autoapply-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <label class="switch-label" for="usetime-toggle">Show time instead of percentage</label>
+        <label class="switch">
+          <input type="checkbox" id="usetime-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row column">
+        <label for="min-duration-input">Minimum video length to track (seconds)</label>
+        <input type="number" id="min-duration-input" min="0" step="1" />
+      </div>
+      <div class="setting-row column">
+        <label for="completed-range">Mark watched at <span id="completed-value">92</span>%</label>
+        <input type="range" id="completed-range" min="0" max="100" step="1" />
+      </div>
+    </div>
+    <div class="footer">
+      <button type="button" id="open-options-btn" class="btn btn-link">OpenSubtitles / TMDB API keys &rarr;</button>
+    </div>
+  </section>
+</div>
+<script src="../common/store.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>
