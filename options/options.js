@@ -415,6 +415,35 @@
     }
   });
 
+  // -------------------------------------------------------------------
+  // Vidstack experimental player - debug log viewer
+  // -------------------------------------------------------------------
+  const vidstackDebugLogEl = document.getElementById('vidstack-debug-log');
+  const vidstackDebugCountEl = document.getElementById('vidstack-debug-count');
+  const vidstackDebugRefreshBtn = document.getElementById('vidstack-debug-refresh-btn');
+  const vidstackDebugClearBtn = document.getElementById('vidstack-debug-clear-btn');
+
+  async function renderVidstackDebugLog() {
+    const log = await NVT.getDebugLog();
+    vidstackDebugCountEl.textContent = log.length ? `(${log.length} entries)` : '(empty - nothing logged yet)';
+    vidstackDebugLogEl.value = log
+      .map((e) => `${new Date(e.t).toLocaleTimeString()} [${e.tag}] ${e.message}`)
+      .join('\n');
+    vidstackDebugLogEl.scrollTop = vidstackDebugLogEl.scrollHeight;
+  }
+
+  vidstackDebugRefreshBtn.addEventListener('click', renderVidstackDebugLog);
+  vidstackDebugClearBtn.addEventListener('click', async () => {
+    await NVT.clearDebugLog();
+    await renderVidstackDebugLog();
+  });
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.nvtDebugLog) renderVidstackDebugLog();
+  });
+  renderVidstackDebugLog().catch((err) => {
+    console.error('[Nepu Watch Tracker] vidstack debug log init failed:', err);
+  });
+
   refreshReleaseStatusUI().catch((err) => {
     console.error('[Nepu Watch Tracker] release status init failed:', err);
   });

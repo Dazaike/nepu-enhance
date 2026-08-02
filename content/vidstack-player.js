@@ -8,6 +8,12 @@
  * player (bundled locally in vendor/vidstack/) pointed at the captured
  * source in its place.
  *
+ * DIAGNOSTICS: nepu.is runs an anti-devtools script, so `console.debug`
+ * output is often unreadable in practice. Every step here is instead
+ * persisted via NVT.pushDebugLog() into chrome.storage.local - view it
+ * from the extension's own Options page (Settings tab), which nepu.is
+ * has no way to interfere with.
+ *
  * This is a best-effort reskin of playback, NOT a validated integration:
  * - Bypasses FluidPlayer's ad delivery (VAST/VMAP) entirely as a side
  *   effect - there is no ad support in this path.
@@ -29,7 +35,13 @@
 
   if (window.__nvtVidstackMountInstalled) return;
   window.__nvtVidstackMountInstalled = true;
-  console.debug('[NVT vidstack] vidstack-player.js installed');
+
+  function log(message) {
+    console.debug('[NVT vidstack]', message);
+    if (typeof NVT !== 'undefined' && NVT.pushDebugLog) NVT.pushDebugLog('vidstack', message);
+  }
+
+  log('vidstack-player.js installed on ' + location.href);
 
   let assetsLoaded = false;
   let mounted = false;
@@ -45,7 +57,9 @@
     const script = document.createElement('script');
     script.type = 'module';
     script.src = chrome.runtime.getURL('vendor/vidstack/vidstack.min.js');
+    script.onerror = () => log('FAILED to load vendor/vidstack/vidstack.min.js - check web_accessible_resources');
     document.head.appendChild(script);
+    log('injected vidstack assets (css + module script)');
   }
 
   /** Walk up from the <video> to find the widest reasonable wrapper to
@@ -66,13 +80,18 @@
   function mount(url, video) {
     if (mounted) return;
     mounted = true;
-    console.debug('[NVT vidstack] mounting for source', url);
+    log('mounting for source: ' + url);
 
     injectAssets();
 
-    const wrapper = findPlayerWrapper(video || document.querySelector('video'));
+    const target = video || document.querySelector('video');
+    if (!target) {
+      log('ABORT: no <video> element found on the page at mount time');
+      return;
+    }
+    const wrapper = findPlayerWrapper(target);
     if (!wrapper || !wrapper.parentElement) {
-      console.warn('[NVT vidstack] could not locate player wrapper to replace - no <video> found yet?');
+      log('ABORT: could not locate a player wrapper to replace');
       return;
     }
 
@@ -88,12 +107,12 @@
     // hls.js from jsdelivr at runtime.
     player.addEventListener('provider-change', (e) => {
       const provider = e.detail;
-      console.debug('[NVT vidstack] provider-change', provider && provider.type);
+      log('provider-change: ' + (provider && provider.type));
       if (provider && provider.type === 'hls') {
         provider.library = chrome.runtime.getURL('vendor/vidstack/hls.min.js');
       }
     });
-    player.addEventListener('error', (e) => console.warn('[NVT vidstack] media-player error', e));
+    player.addEventListener('error', (e) => log('media-player error: ' + (e && e.detail && e.detail.message)));
     player.style.width = '100%';
     player.style.aspectRatio = '16 / 9';
 
@@ -103,12 +122,17 @@
     player.appendChild(skin);
 
     wrapper.parentElement.insertBefore(player, wrapper.nextSibling);
-    console.debug('[NVT vidstack] player element inserted', player);
+    log('player element inserted into DOM');
 
     customElements.whenDefined('media-player').then(
-      () => console.debug('[NVT vidstack] media-player custom element defined/upgraded'),
-      () => {}
+      () => log('media-player custom element upgraded successfully'),
+      (err) => log('media-player custom element FAILED to upgrade: ' + err)
     );
+    setTimeout(() => {
+      if (!customElements.get('media-player')) {
+        log('WARNING: media-player still not defined 5s after mount - vidstack.min.js likely failed to load/execute');
+      }
+    }, 5000);
   }
 
   function maybeMount(url, source) {
@@ -116,7 +140,7 @@
     chrome.storage.local.get('settings', (res) => {
       const settings = res && res.settings;
       if (!settings || settings.vidstackPlayerEnabled !== true) {
-        console.debug('[NVT vidstack] source found via', source, 'but feature is disabled in Settings');
+        log('source found via ' + source + ' but feature is disabled in Settings - ignoring');
         return;
       }
       mount(url, document.querySelector('video'));
@@ -125,12 +149,23 @@
 
   document.addEventListener('nvt:video-source-found', (e) => {
     const detail = e.detail || {};
+    log('event received: source via ' + detail.source + ' -> ' + detail.url);
     maybeMount(detail.url, 'event:' + detail.source);
+  });
+
+  // Relay from the MAIN-world capture script, which cannot call
+  // chrome.storage itself (MAIN world runs with the page's own privileges,
+  // not the extension's).
+  document.addEventListener('nvt:debug', (e) => {
+    log('[capture] ' + (e.detail && e.detail.message));
   });
 
   // Covers the case where player-capture.js (document_start) found the
   // source and dispatched its event before this script (document_idle)
   // had a listener registered.
   const early = document.documentElement.dataset.nvtVideoSource;
-  if (early) maybeMount(early, 'early-attribute');
+  if (early) {
+    log('found early-attribute source from before this script loaded: ' + early);
+    maybeMount(early, 'early-attribute');
+  }
 })();

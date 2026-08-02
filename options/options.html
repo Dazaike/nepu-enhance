@@ -93,6 +93,14 @@
         direct stream URL can be detected. Unverified against Nepu's live player - may not work on every
         &quot;server&quot;, and disables Nepu's own ad delivery for whatever it does replace. Off by default.</p>
       <div class="setting-row column">
+        <label for="vidstack-debug-log">Vidstack debug log <span id="vidstack-debug-count" class="muted"></span></label>
+        <textarea id="vidstack-debug-log" readonly rows="8" style="font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; resize: vertical;"></textarea>
+        <div class="setting-row" style="margin-top: 6px;">
+          <button type="button" id="vidstack-debug-refresh-btn" class="btn btn-secondary btn-sm">Refresh</button>
+          <button type="button" id="vidstack-debug-clear-btn" class="btn btn-ghost btn-sm">Clear</button>
+        </div>
+      </div>
+      <div class="setting-row column">
         <label for="min-duration-input">Minimum video length to track (seconds)</label>
         <input type="number" id="min-duration-input" min="0" step="1" />
       </div>

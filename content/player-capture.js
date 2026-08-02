@@ -11,15 +11,18 @@
  * the original manifest/file URL, which only shows up as a network
  * request, not as `video.src`.
  *
- * Communicates the captured URL to the isolated-world content script
- * (content/vidstack-player.js) two ways, to cover both race directions:
- * 1. A CustomEvent on `document` (not `window` - MAIN and ISOLATED
- *    worlds each have their own `window` global; only `document` is
- *    actually shared between them).
- * 2. A `data-nvt-video-source` attribute on <html>, read on isolated
- *    script startup in case the source was found before that script's
- *    listener was registered (this one runs at document_start, the
- *    isolated player script at document_idle).
+ * Communicates with the isolated-world content script
+ * (content/vidstack-player.js) via CustomEvents on `document` (not
+ * `window` - MAIN and ISOLATED worlds each have their own `window`
+ * global; only `document` is actually shared between them):
+ * - `nvt:video-source-found` - a plausible source URL was captured.
+ * - `nvt:debug` - a diagnostic message, relayed into the extension's
+ *   persistent debug log (this world has no chrome.storage access, so it
+ *   cannot write there directly).
+ * A `data-nvt-video-source` attribute on <html> is also set as a fallback
+ * for the case where the source is found before the isolated script's
+ * listener is registered (this runs at document_start, the isolated
+ * player script at document_idle).
  *
  * KNOWN LIMITATION: only sees requests made in the frame this script runs
  * in. If a given "server" on nepu.is loads playback inside a cross-origin
@@ -31,7 +34,16 @@
 
   if (window.__nvtPlayerCaptureInstalled) return;
   window.__nvtPlayerCaptureInstalled = true;
-  console.debug('[NVT vidstack] player-capture.js installed');
+
+  function debug(message) {
+    try {
+      document.dispatchEvent(new CustomEvent('nvt:debug', { detail: { message } }));
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  debug('player-capture.js installed on ' + location.href);
 
   const VIDEO_URL_RE = /\.(m3u8|mp4|webm|mkv)(\?|#|$)/i;
   let reported = false;
@@ -40,7 +52,7 @@
     if (reported || !url || typeof url !== 'string') return;
     if (!VIDEO_URL_RE.test(url)) return;
     reported = true;
-    console.debug('[NVT vidstack] source captured via', source, url);
+    debug('source captured via ' + source + ': ' + url);
     try {
       document.documentElement.dataset.nvtVideoSource = url;
       document.dispatchEvent(
@@ -49,7 +61,7 @@
         })
       );
     } catch (err) {
-      console.debug('[NVT vidstack] report failed', err);
+      debug('report() failed: ' + err);
     }
   }
 
@@ -85,6 +97,7 @@
   function watchVideo(video) {
     if (!video || video.__nvtWatched) return;
     video.__nvtWatched = true;
+    debug('found <video> element, watching for src');
     const check = () => {
       const src = video.currentSrc || video.src;
       if (src && !src.startsWith('blob:')) report(src, 'video-src');
@@ -116,4 +129,21 @@
 
   if (document.documentElement) start();
   else document.addEventListener('DOMContentLoaded', start, { once: true });
+
+  // Diagnostic snapshot a few seconds in: distinguishes "no video ever
+  // appeared" from "a video exists but only ever got a blob: src" (the
+  // latter means HLS.js grabbed the stream before our fetch/XHR patch saw
+  // the manifest request - shouldn't happen given document_start timing,
+  // but worth surfacing if it does).
+  setTimeout(() => {
+    if (reported) return;
+    const videos = document.querySelectorAll('video');
+    if (!videos.length) {
+      debug('5s check: no <video> element found anywhere in this frame yet');
+      return;
+    }
+    videos.forEach((v, i) => {
+      debug('5s check: video[' + i + '] src=' + (v.currentSrc || v.src || '(none)'));
+    });
+  }, 5000);
 })();

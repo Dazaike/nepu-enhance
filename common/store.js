@@ -15,6 +15,7 @@ const NVT = (() => {
   const HIST_PREFIX = 'hist:';
   const WL_PREFIX = 'wl:';
   const SETTINGS_KEY = 'settings';
+  const DEBUG_LOG_KEY = 'nvtDebugLog';
   const SUB_AUTH_KEYS = ['sub:osApiKey', 'sub:tmdbApiKey'];
   const DROPBOX_AUTH_KEYS = [
     'dropbox:appKey',
@@ -308,6 +309,33 @@ const NVT = (() => {
     await chrome.storage.local.set({ [RELEASE_STATUS_KEY]: next });
     return next;
   }
+
+  const DEBUG_LOG_MAX = 80;
+
+  /** Small in-storage debug trail so experimental features (e.g. the
+   * Vidstack player swap) can be diagnosed on sites whose own anti-devtool
+   * scripts block opening DevTools there - read it from the extension's
+   * own Options page instead, which nepu.is has no control over. */
+  async function pushDebugLog(tag, message) {
+    try {
+      const res = await chrome.storage.local.get(DEBUG_LOG_KEY);
+      const log = Array.isArray(res[DEBUG_LOG_KEY]) ? res[DEBUG_LOG_KEY] : [];
+      log.push({ t: Date.now(), tag, message: String(message) });
+      while (log.length > DEBUG_LOG_MAX) log.shift();
+      await chrome.storage.local.set({ [DEBUG_LOG_KEY]: log });
+    } catch (_) {
+      /* ignore - logging must never break the caller */
+    }
+  }
+
+  async function getDebugLog() {
+    const res = await chrome.storage.local.get(DEBUG_LOG_KEY);
+    return Array.isArray(res[DEBUG_LOG_KEY]) ? res[DEBUG_LOG_KEY] : [];
+  }
+
+  async function clearDebugLog() {
+    await chrome.storage.local.set({ [DEBUG_LOG_KEY]: [] });
+  }
   return {
     HIST_PREFIX,
     WL_PREFIX,
@@ -341,6 +369,9 @@ const NVT = (() => {
     setSyncStatus,
     getReleaseStatus,
     setReleaseStatus,
+    pushDebugLog,
+    getDebugLog,
+    clearDebugLog,
   };
 
 })();
