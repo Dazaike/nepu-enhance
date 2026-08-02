@@ -124,6 +124,35 @@
         background: #34d399 !important;
         filter: brightness(1.05);
       }
+      .nvt-rail-remove {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        z-index: 4;
+        width: 24px;
+        height: 24px;
+        border: none;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.65);
+        color: #fff;
+        font-size: 14px;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.15s ease, background 0.15s ease;
+        padding: 0;
+        font-family: inherit;
+      }
+      .nvt-rail-card:hover .nvt-rail-remove,
+      .nvt-rail-remove:focus {
+        opacity: 1;
+      }
+      .nvt-rail-remove:hover {
+        background: #ef4444;
+      }
       .nvt-rail-badge.nvt-rail-rating {
         top: auto;
         left: auto;
@@ -560,6 +589,25 @@
       fill.style.width = pct + '%';
       track.appendChild(fill);
       thumb.appendChild(track);
+
+      // Remove from Continue Watching (same as popup ✕) without navigating.
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'nvt-rail-remove';
+      removeBtn.setAttribute('aria-label', 'Remove from Continue Watching');
+      removeBtn.title = 'Remove from Continue Watching';
+      removeBtn.textContent = '\u00d7';
+      removeBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+          if (item && item.id) await NVT.removeHistory(item.id);
+          scheduleRender(50);
+        } catch (err) {
+          console.debug('[Nepu Home Rails] remove Continue Watching failed', err);
+        }
+      });
+      thumb.appendChild(removeBtn);
     }
 
     const title = document.createElement('div');
