@@ -11,6 +11,7 @@
  * Per-item keys (instead of one big array) avoid read-modify-write races
  * between multiple tabs updating progress concurrently.
  */
+if (typeof self === 'undefined' || !self.NVT) {
 const NVT = (() => {
   const HIST_PREFIX = 'hist:';
   const WL_PREFIX = 'wl:';
@@ -379,3 +380,4 @@ const NVT = (() => {
 // Service workers use importScripts() and have no `window`; content
 // scripts / extension pages get a `window`. Export defensively either way.
 if (typeof self !== 'undefined') self.NVT = NVT;
+}

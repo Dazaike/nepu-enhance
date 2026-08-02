@@ -132,10 +132,17 @@
 
   // Diagnostic snapshot a few seconds in: distinguishes "no video ever
   // appeared" from "a video exists but only ever got a blob: src" (the
-  // latter means HLS.js grabbed the stream before our fetch/XHR patch saw
-  // the manifest request - shouldn't happen given document_start timing,
-  // but worth surfacing if it does).
+  // latter usually means the manifest was fetched from a frame this
+  // script never ran in - e.g. a same-site iframe on a subdomain our
+  // match patterns don't cover, or a genuinely cross-origin embed).
   setTimeout(() => {
+    debug('5s check: this frame is ' + (window.top === window.self ? 'the TOP frame' : 'an IFRAME') + ' at ' + location.href);
+    const iframes = document.querySelectorAll('iframe');
+    if (iframes.length) {
+      iframes.forEach((f, i) => debug('5s check: iframe[' + i + '] src=' + (f.src || '(no src attribute)')));
+    } else {
+      debug('5s check: no <iframe> elements found in this frame');
+    }
     if (reported) return;
     const videos = document.querySelectorAll('video');
     if (!videos.length) {
