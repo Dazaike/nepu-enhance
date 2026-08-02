@@ -14,6 +14,9 @@
   const autoApplyToggle = document.getElementById('autoapply-toggle');
   const useTimeToggle = document.getElementById('usetime-toggle');
   const dropboxAutoSyncToggle = document.getElementById('dropbox-autosync-toggle');
+  const relTrackToggle = document.getElementById('rel-track-toggle');
+  const relNotifToggle = document.getElementById('rel-notif-toggle');
+  const relIntervalSelect = document.getElementById('rel-interval-select');
   const minDurationInput = document.getElementById('min-duration-input');
   const completedRange = document.getElementById('completed-range');
   const completedValueEl = document.getElementById('completed-value');
@@ -29,6 +32,9 @@
     autoApplyToggle.checked = !!settings.autoApplyCaptions;
     useTimeToggle.checked = !!settings.useTimeProgress;
     dropboxAutoSyncToggle.checked = settings.dropboxAutoSync !== false;
+    relTrackToggle.checked = !!settings.releaseTrackingEnabled;
+    relNotifToggle.checked = !!settings.desktopNotificationsEnabled;
+    relIntervalSelect.value = String(settings.releaseCheckIntervalHours || 12);
     minDurationInput.value = settings.minDurationSeconds;
     completedRange.value = Math.round((settings.completedThreshold || 0) * 100);
     completedValueEl.textContent = completedRange.value;
@@ -47,6 +53,17 @@
     });
     dropboxAutoSyncToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ dropboxAutoSync: dropboxAutoSyncToggle.checked });
+    });
+    relTrackToggle.addEventListener('change', async () => {
+      state.settings = await NVT.setSettings({ releaseTrackingEnabled: relTrackToggle.checked });
+      chrome.runtime.sendMessage({ type: 'UPDATE_RELEASE_ALARM' });
+    });
+    relNotifToggle.addEventListener('change', async () => {
+      state.settings = await NVT.setSettings({ desktopNotificationsEnabled: relNotifToggle.checked });
+    });
+    relIntervalSelect.addEventListener('change', async () => {
+      state.settings = await NVT.setSettings({ releaseCheckIntervalHours: Number(relIntervalSelect.value) });
+      chrome.runtime.sendMessage({ type: 'UPDATE_RELEASE_ALARM' });
     });
     minDurationInput.addEventListener('change', async () => {
       const v = Math.max(0, Math.round(Number(minDurationInput.value) || 0));
@@ -278,6 +295,119 @@
     console.error('[Nepu Watch Tracker] dropbox status failed:', err);
   });
 
+  // -------------------------------------------------------------------
+  // New Release Tracking & Notifications controls
+  // -------------------------------------------------------------------
+  const relTestNotifBtn = document.getElementById('rel-test-notif-btn');
+  const relCheckNowBtn = document.getElementById('rel-check-now-btn');
+  const relStatusEl = document.getElementById('rel-status');
+  const relOptOutListEl = document.getElementById('rel-optout-list');
+
+  function setReleaseStatusUI(message, kind) {
+    relStatusEl.textContent = message;
+    relStatusEl.style.color = kind === 'error' ? '#fca5a5' : kind === 'ok' ? '#8dffb0' : '';
+  }
+
+  async function renderReleaseOptOutList() {
+    const [watchlist, settings] = await Promise.all([NVT.listWatchlist(), NVT.getSettings()]);
+    const tvItems = watchlist.filter((w) => w && w.mediaType === 'tv');
+    const optOuts = new Set(settings.releaseOptOutIds || []);
+
+    relOptOutListEl.innerHTML = '';
+    if (!tvItems.length) {
+      const span = document.createElement('span');
+      span.className = 'tag-empty';
+      span.textContent = 'No TV shows in your Watchlist yet.';
+      relOptOutListEl.appendChild(span);
+      return;
+    }
+
+    tvItems.forEach((item) => {
+      const div = document.createElement('div');
+      div.className = 'optout-item';
+
+      const curSe = item.season != null && item.episode != null ? `S${item.season} E${item.episode}` : 'Bookmarked';
+      const latestSe = item.latestSeason != null && item.latestEpisode != null
+        ? ` · Latest: S${item.latestSeason} E${item.episode}${item.hasNewRelease ? ' (NEW)' : ''}`
+        : '';
+
+      div.innerHTML = `
+        <div class="optout-item-body">
+          <div class="optout-item-title">${escapeHtml(item.title || item.url || 'Show')}</div>
+          <div class="optout-item-sub">${escapeHtml(curSe)}${escapeHtml(latestSe)}</div>
+        </div>
+        <label class="switch" title="Enable release tracking for this show">
+          <input type="checkbox" class="optout-checkbox" ${!optOuts.has(item.id) ? 'checked' : ''} />
+          <span class="switch-slider"></span>
+        </label>
+      `;
+
+      div.querySelector('.optout-checkbox').addEventListener('change', async (e) => {
+        const enabled = e.target.checked;
+        const curSettings = await NVT.getSettings();
+        const curOptOuts = new Set(curSettings.releaseOptOutIds || []);
+        if (enabled) {
+          curOptOuts.delete(item.id);
+        } else {
+          curOptOuts.add(item.id);
+        }
+        state.settings = await NVT.setSettings({ releaseOptOutIds: Array.from(curOptOuts) });
+      });
+
+      relOptOutListEl.appendChild(div);
+    });
+  }
+
+  async function refreshReleaseStatusUI() {
+    const [status, settings] = await Promise.all([NVT.getReleaseStatus(), NVT.getSettings()]);
+    const bits = [settings.releaseTrackingEnabled ? 'Release tracking enabled' : 'Release tracking disabled'];
+    if (status.checking) {
+      bits.push('checking for new episodes…');
+    } else if (status.lastCheckAt) {
+      bits.push(`last checked ${new Date(status.lastCheckAt).toLocaleString()}`);
+      if (status.newReleasesFound) bits.push(`${status.newReleasesFound} new release(s) found!`);
+    }
+    if (status.lastCheckOk === false && status.lastCheckError) bits.push(`error: ${status.lastCheckError}`);
+    setReleaseStatusUI(bits.join(' · '), status.lastCheckOk === false ? 'error' : settings.releaseTrackingEnabled ? 'ok' : 'warn');
+    await renderReleaseOptOutList();
+  }
+
+  relTestNotifBtn.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ type: 'SEND_TEST_NOTIFICATION' }, (res) => {
+      if (res && res.ok) {
+        setReleaseStatusUI('Test notification sent!', 'ok');
+      } else {
+        setReleaseStatusUI((res && res.error) || 'Failed to send test notification.', 'error');
+      }
+    });
+  });
+
+  relCheckNowBtn.addEventListener('click', async () => {
+    relCheckNowBtn.disabled = true;
+    setReleaseStatusUI('Checking TMDB for new releases…', 'info');
+    try {
+      const res = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: 'CHECK_RELEASES_NOW' }, resolve);
+      });
+      if (res && res.ok) {
+        setReleaseStatusUI(
+          res.newReleasesFound
+            ? `Check complete · Found ${res.newReleasesFound} new episode(s)!`
+            : 'Check complete · All Watchlist shows up to date.',
+          'ok'
+        );
+      } else {
+        setReleaseStatusUI((res && res.error) || 'Release check failed.', 'error');
+      }
+    } finally {
+      relCheckNowBtn.disabled = false;
+      await refreshReleaseStatusUI();
+    }
+  });
+
+  refreshReleaseStatusUI().catch((err) => {
+    console.error('[Nepu Watch Tracker] release status init failed:', err);
+  });
   initSettings().catch((err) => {
     console.error('[Nepu Watch Tracker] options init failed:', err);
   });

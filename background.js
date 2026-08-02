@@ -2,23 +2,23 @@ importScripts('common/store.js');
 
 /**
  * NEPU_SUB_NET_FETCH: content/subtitles.js cannot reliably cross-origin
- * fetch OpenSubtitles/TMDB from a page's execution context (CORS
- * preflight on custom headers like Api-Key/Authorization is not
- * guaranteed). The service worker has host_permissions for those hosts,
- * which exempts its fetches from CORS entirely.
+ * fetch OpenSubtitles/TMDB from a page's execution context.
  *
- * NEPU_SUB_OPEN_OPTIONS: content scripts can't reliably call
- * chrome.runtime.openOptionsPage() themselves, so they ask the background
- * page to do it (used when an OpenSubtitles/TMDB key is missing).
+ * NEPU_SUB_OPEN_OPTIONS: opens full-page options screen.
  *
- * DROPBOX_SYNC: pulls/merges/pushes Continue Watching, Watchlist, and
- * settings against a single JSON file in the user's Dropbox app folder.
- * Runs here (not in the content script that triggers it) for the same
- * CORS-bypass reason, and so token refresh never races across tabs.
+ * DROPBOX_SYNC: pulls/merges/pushes history, watchlist, and settings to Dropbox.
+ *
+ * SEND_TEST_NOTIFICATION: fires a test desktop notification.
+ *
+ * CHECK_RELEASES_NOW: triggers immediate TMDB new episode check for watchlist items.
  */
 
 const DROPBOX_SYNC_PATH = '/nepu-watch-tracker-sync.json';
 const MIN_AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes between automatic syncs
+
+// ---------------------------------------------------------------------------
+// 1. Dropbox Sync Engine
+// ---------------------------------------------------------------------------
 
 async function dropboxRefreshToken(auth) {
   const resp = await fetch('https://api.dropboxapi.com/oauth2/token', {
@@ -163,6 +163,171 @@ async function performDropboxSync(force) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 2. New Release Tracking & Desktop Notifications
+// ---------------------------------------------------------------------------
+
+async function tmdbFetch(path, query, apiKey) {
+  const params = new URLSearchParams(query || {});
+  params.set('api_key', apiKey);
+  const resp = await fetch(`https://api.themoviedb.org/3${path}?${params.toString()}`);
+  if (!resp.ok) return null;
+  return resp.json().catch(() => null);
+}
+
+async function checkNewReleases(force) {
+  try {
+    const settings = await NVT.getSettings();
+    if (!force && !settings.releaseTrackingEnabled) {
+      return { ok: true, skipped: true };
+    }
+
+    const subAuth = await NVT.getSubtitleAuth();
+    const apiKey = subAuth.tmdbApiKey;
+    if (!apiKey) {
+      const msg = 'TMDB API key missing. Add a free TMDB key on the options page to enable release tracking.';
+      await NVT.setReleaseStatus({ checking: false, lastCheckAt: Date.now(), lastCheckOk: false, lastCheckError: msg });
+      return { ok: false, error: msg };
+    }
+
+    await NVT.setReleaseStatus({ checking: true });
+
+    const watchlist = await NVT.listWatchlist();
+    const optOuts = new Set(settings.releaseOptOutIds || []);
+    const tvItems = watchlist.filter((item) => item && item.mediaType === 'tv' && !optOuts.has(item.id));
+
+    let newReleasesFound = 0;
+    const today = new Date().toISOString().slice(0, 10);
+
+    for (const item of tvItems) {
+      try {
+        let seriesId = item.tmdbId;
+
+        if (!seriesId && item.imdbId) {
+          const findData = await tmdbFetch(`/find/${item.imdbId}`, { external_source: 'imdb_id' }, apiKey);
+          if (findData && findData.tv_results && findData.tv_results[0]) {
+            seriesId = findData.tv_results[0].id;
+          }
+        }
+
+        if (!seriesId && item.title) {
+          const cleanQ = item.title.replace(/\b[Ss]\d+\s*[Ee]\d+\b/g, '').replace(/\b(19|20)\d{2}\b/g, '').trim();
+          const searchData = await tmdbFetch('/search/tv', { query: cleanQ }, apiKey);
+          if (searchData && searchData.results && searchData.results[0]) {
+            seriesId = searchData.results[0].id;
+          }
+        }
+
+        if (!seriesId) continue;
+
+        const series = await tmdbFetch(`/tv/${seriesId}`, {}, apiKey);
+        if (!series || !series.last_episode_to_air) continue;
+
+        const lastEp = series.last_episode_to_air;
+        const s = lastEp.season_number;
+        const e = lastEp.episode_number;
+        const airDate = lastEp.air_date || '';
+
+        const curSeason = item.season != null ? Number(item.season) : 0;
+        const curEpisode = item.episode != null ? Number(item.episode) : 0;
+
+        const isNewer = s > curSeason || (s === curSeason && e > curEpisode);
+        const hasAired = !!airDate && airDate <= today;
+
+        const hadNewReleaseBefore = !!item.hasNewRelease;
+        const hasNewRelease = isNewer && hasAired;
+
+        if (hasNewRelease || hadNewRelease !== hasNewRelease) {
+          const updated = {
+            ...item,
+            hasNewRelease,
+            latestSeason: s,
+            latestEpisode: e,
+            latestAirDate: airDate,
+            latestTitle: lastEp.name || '',
+            lastReleaseCheckAt: Date.now(),
+          };
+          await NVT.putWatchlistRaw(updated);
+
+          if (hasNewRelease && !hadNewReleaseBefore && settings.desktopNotificationsEnabled) {
+            newReleasesFound++;
+            try {
+              chrome.notifications.create('nepu-rel-' + item.id, {
+                type: 'basic',
+                iconUrl: 'icons/icon128.png',
+                title: `New Episode: ${item.title}`,
+                message: `Season ${s}, Episode ${e} (${lastEp.name || 'Latest'}) is out now! Click to open.`,
+                priority: 2,
+              });
+            } catch (notifErr) {
+              console.warn('[Nepu background] notification create failed:', notifErr);
+            }
+          }
+        }
+      } catch (itemErr) {
+        console.warn('[Nepu background] release check failed for item:', item.title, itemErr);
+      }
+    }
+
+    const checkTime = Date.now();
+    await NVT.setReleaseStatus({
+      checking: false,
+      lastCheckAt: checkTime,
+      lastCheckOk: true,
+      lastCheckError: '',
+      newReleasesFound,
+    });
+    return { ok: true, lastCheckAt: checkTime, newReleasesFound };
+  } catch (err) {
+    const msg = String((err && err.message) || err);
+    await NVT.setReleaseStatus({ checking: false, lastCheckOk: false, lastCheckError: msg });
+    return { ok: false, error: msg };
+  }
+}
+
+async function setupReleaseAlarm() {
+  try {
+    const settings = await NVT.getSettings();
+    await chrome.alarms.clear('checkNewReleases');
+    if (settings.releaseTrackingEnabled) {
+      const hours = settings.releaseCheckIntervalHours || 12;
+      chrome.alarms.create('checkNewReleases', { periodInMinutes: hours * 60 });
+    }
+  } catch (err) {
+    console.warn('[Nepu background] alarm setup failed:', err);
+  }
+}
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm && alarm.name === 'checkNewReleases') {
+    checkNewReleases(false);
+  }
+});
+
+chrome.notifications.onClicked.addListener(async (notifId) => {
+  if (!notifId) return;
+  if (notifId.startsWith('nepu-rel-')) {
+    const itemId = notifId.replace('nepu-rel-', '');
+    const watchlist = await NVT.listWatchlist();
+    const item = watchlist.find((w) => w.id === itemId);
+    if (item && item.url) {
+      chrome.tabs.create({ url: item.url });
+    }
+  }
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  setupReleaseAlarm();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  setupReleaseAlarm();
+});
+
+// ---------------------------------------------------------------------------
+// 3. Message Routing
+// ---------------------------------------------------------------------------
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === 'NEPU_SUB_OPEN_OPTIONS') {
     chrome.runtime.openOptionsPage();
@@ -172,6 +337,35 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === 'DROPBOX_SYNC') {
     performDropboxSync(!!(msg.payload && msg.payload.force)).then(sendResponse);
     return true; // async response
+  }
+
+  if (msg && msg.type === 'SEND_TEST_NOTIFICATION') {
+    try {
+      chrome.notifications.create(
+        'nepu-test-' + Date.now(),
+        {
+          type: 'basic',
+          iconUrl: 'icons/icon128.png',
+          title: 'Nepu Watch Tracker — Test Notification',
+          message: 'Desktop notifications are working! You will be alerted when new episodes of Watchlist shows air.',
+          priority: 2,
+        },
+        () => sendResponse({ ok: true })
+      );
+    } catch (err) {
+      sendResponse({ ok: false, error: String((err && err.message) || err) });
+    }
+    return true;
+  }
+
+  if (msg && msg.type === 'CHECK_RELEASES_NOW') {
+    checkNewReleases(true).then(sendResponse);
+    return true;
+  }
+
+  if (msg && msg.type === 'UPDATE_RELEASE_ALARM') {
+    setupReleaseAlarm().then(() => sendResponse({ ok: true }));
+    return true;
   }
 
   if (!msg || msg.type !== 'NEPU_SUB_NET_FETCH') return false;

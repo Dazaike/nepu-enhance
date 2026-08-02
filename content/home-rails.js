@@ -75,9 +75,15 @@
         position: absolute;
         top: 6px;
         left: 6px;
-        font-size: 11px;
-        padding: 2px 5px;
-        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.6);
+        color: #fff;
+      }
+      .nvt-rail-badge.nvt-rail-new-release {
+        background: #10b981 !important;
+        color: #042f2e !important;
+        font-weight: 700;
+        box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);
+      }
         background: rgba(0, 0, 0, 0.6);
         color: #fff;
       }
@@ -164,14 +170,19 @@
       thumb.appendChild(fallbackEl());
     }
 
-    // Season/episode badge — only shown for TV episodes; movies get no
-    // badge at all (no generic movie/TV icon clutter).
-    const se = seLabel(item);
-    if (se) {
+    if (mode === 'watchlist' && item.hasNewRelease && item.latestSeason != null && item.latestEpisode != null) {
       const badge = document.createElement('div');
-      badge.className = 'nvt-rail-badge';
-      badge.textContent = se;
+      badge.className = 'nvt-rail-badge nvt-rail-new-release';
+      badge.textContent = `NEW S${item.latestSeason} E${item.latestEpisode}`;
       thumb.appendChild(badge);
+    } else {
+      const se = seLabel(item);
+      if (se) {
+        const badge = document.createElement('div');
+        badge.className = 'nvt-rail-badge';
+        badge.textContent = se;
+        thumb.appendChild(badge);
+      }
     }
 
     if (mode === 'continue') {

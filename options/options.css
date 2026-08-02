@@ -80,3 +80,33 @@
   font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11.5px;
 }
+
+.optout-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.optout-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.optout-item-title {
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.optout-item-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}

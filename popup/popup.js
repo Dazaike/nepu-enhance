@@ -273,7 +273,10 @@
   function buildWatchlistListRow(item) {
     const row = document.createElement('div');
     row.className = 'row';
-    const meta = seasonEpisodeLabel(item);
+    let meta = seasonEpisodeLabel(item);
+    if (item.hasNewRelease && item.latestSeason != null && item.latestEpisode != null) {
+      meta += ` &middot; <span style="color:#10b981;font-weight:600">NEW S${item.latestSeason} E${item.latestEpisode}</span>`;
+    }
     row.innerHTML = `
       ${thumbMarkup(item.poster, 'lg')}
       <div class="row-body">
@@ -294,10 +297,16 @@
     const se = seLabel(item);
     const el = document.createElement('div');
     el.className = 'grid-item';
+    let badgeHtml = '';
+    if (item.hasNewRelease && item.latestSeason != null && item.latestEpisode != null) {
+      badgeHtml = `<div class="grid-badge new-release" title="New episode released!">NEW S${item.latestSeason} E${item.latestEpisode}</div>`;
+    } else if (se) {
+      badgeHtml = `<div class="grid-badge">${escapeHtml(se)}</div>`;
+    }
     el.innerHTML = `
       <div class="grid-thumb">
         ${thumbMarkup(item.poster)}
-        ${se ? `<div class="grid-badge">${escapeHtml(se)}</div>` : ''}
+        ${badgeHtml}
         <div class="grid-overlay">
           <div class="grid-se">${escapeHtml(seasonEpisodeLabel(item))}</div>
           <div class="grid-actions">

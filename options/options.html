@@ -132,6 +132,47 @@
     </div>
   </section>
 
+  <section class="options-card">
+    <h2>New release tracking &amp; Notifications</h2>
+    <p class="muted">
+      Monitors TMDB for new TV episode air dates and sends a desktop notification when a new episode of something in your Watchlist is released.
+    </p>
+    <div class="settings-list">
+      <div class="setting-row">
+        <label class="switch-label" for="rel-track-toggle">Track new episode releases</label>
+        <label class="switch">
+          <input type="checkbox" id="rel-track-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <label class="switch-label" for="rel-notif-toggle">Desktop notifications</label>
+        <label class="switch">
+          <input type="checkbox" id="rel-notif-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row column">
+        <label for="rel-interval-select">Check frequency</label>
+        <select id="rel-interval-select">
+          <option value="6">Every 6 hours</option>
+          <option value="12">Every 12 hours</option>
+          <option value="24">Every 24 hours</option>
+        </select>
+      </div>
+      <div class="tag-input-row">
+        <button type="button" id="rel-test-notif-btn" class="btn btn-secondary btn-sm">Send test notification</button>
+        <button type="button" id="rel-check-now-btn" class="btn btn-primary btn-sm">Check for new releases now</button>
+      </div>
+      <div id="rel-status" class="muted"></div>
+      <div class="setting-row column">
+        <label>Per-show release tracking opt-out</label>
+        <p class="muted">Uncheck any show to disable release tracking and notifications for that specific title.</p>
+        <div id="rel-optout-list" class="optout-list"></div>
+      </div>
+    </div>
+  </section>
+
   <section class="options-card danger-zone">
     <h2>Danger zone</h2>
     <p class="muted">These actions cannot be undone.</p>

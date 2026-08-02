@@ -24,6 +24,7 @@ const NVT = (() => {
     'dropbox:accountEmail',
   ];
   const SYNC_STATUS_KEY = 'dropboxSyncStatus';
+  const RELEASE_STATUS_KEY = 'releaseCheckStatus';
 
   const DEFAULT_SETTINGS = Object.freeze({
     trackingEnabled: true,
@@ -34,6 +35,10 @@ const NVT = (() => {
     autoApplyCaptions: false,
     useTimeProgress: false,
     dropboxAutoSync: true,
+    releaseTrackingEnabled: true,
+    desktopNotificationsEnabled: true,
+    releaseCheckIntervalHours: 12,
+    releaseOptOutIds: [],
     updatedAt: 0,
   });
 
@@ -276,12 +281,31 @@ const NVT = (() => {
     return next;
   }
 
+  async function getReleaseStatus() {
+    const res = await chrome.storage.local.get(RELEASE_STATUS_KEY);
+    return {
+      checking: false,
+      lastCheckAt: 0,
+      lastCheckOk: null,
+      lastCheckError: '',
+      newReleasesFound: 0,
+      ...(res[RELEASE_STATUS_KEY] || {}),
+    };
+  }
+
+  async function setReleaseStatus(patch) {
+    const cur = await getReleaseStatus();
+    const next = { ...cur, ...patch };
+    await chrome.storage.local.set({ [RELEASE_STATUS_KEY]: next });
+    return next;
+  }
   return {
     HIST_PREFIX,
     WL_PREFIX,
     SUB_AUTH_KEYS,
     DROPBOX_AUTH_KEYS,
     SYNC_STATUS_KEY,
+    RELEASE_STATUS_KEY,
     DEFAULT_SETTINGS,
     idFor,
     getSettings,
@@ -306,6 +330,8 @@ const NVT = (() => {
     clearDropboxAuth,
     getSyncStatus,
     setSyncStatus,
+    getReleaseStatus,
+    setReleaseStatus,
   };
 
 })();

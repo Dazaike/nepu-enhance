@@ -17,7 +17,8 @@ A Chrome (Manifest V3) extension for [Nepu](https://nepu.to/) and its mirrors
 - **Dropbox sync** — backs up Continue Watching, Watchlist, and settings
   to your own Dropbox app folder and merges them back in (newest wins),
   automatically each time you open a Nepu page, or on demand.
-
+- **New release tracking** — monitors TMDB for new TV episode air dates
+  for your Watchlist shows and sends desktop notifications when new episodes air.
 ## Install (unpacked)
 
 1. Clone or download this repository.
@@ -74,6 +75,18 @@ in the popup's Settings tab — which also has an **Auto-sync with Dropbox**
 toggle and a status line showing the last sync result. Auto-apply and API
 keys stay local; syncing never uploads your OpenSubtitles/TMDB keys.
 
+### New release tracking & Notifications
+Monitors TMDB air dates for TV shows in your Watchlist and alerts you via
+desktop notifications when a new episode airs.
+
+- **Automatic background checks:** Runs periodically via `chrome.alarms`
+  (configurable to 6, 12, or 24 hours).
+- **Visual badges:** Cards with un-watched released episodes show a prominent
+  `NEW S3 E9` badge in the popup and on the homepage Watchlist rail.
+- **Per-show opt-out:** Enable/disable release tracking for specific shows
+  on the options page.
+- **Test notification button:** Click **Send test notification** on the options
+  page to test desktop notifications anytime.
 ## Settings
 
 Available from the popup's **Settings** tab and the full options page:
@@ -87,7 +100,8 @@ Available from the popup's **Settings** tab and the full options page:
 | Minimum video length to track | Ignore short clips/previews below this length |
 | Mark watched at % | Progress threshold at which a video drops out of Continue Watching |
 | Auto-sync with Dropbox | Sync automatically on every Nepu page open (see **Sync now** for a manual trigger) |
-
+| Track new episode releases | Background checks via TMDB for new TV episode air dates |
+| Desktop notifications | Send OS desktop notifications when new episodes air |
 ## Permissions
 
 - `storage` — all watch history, watchlist entries, and settings are kept
@@ -100,7 +114,8 @@ Available from the popup's **Settings** tab and the full options page:
 - `identity`, and host permissions for `dropboxapi.com` — used only if you
   connect Dropbox sync on the options page; the OAuth flow and file
   upload/download run through this permission.
-
+- `notifications`, `alarms` — used for desktop alerts and periodic background
+  checks when new TV episodes air.
 ## Project layout
 
 ```
@@ -127,8 +142,3 @@ icons/
   cannot be injected into that frame (a browser security limitation, not
   something this extension can work around).
 
-## Roadmap
-
-- **New release tracking** — coming soon: get notified when a new
-  episode of something in your Watchlist is released, instead of having
-  to check back manually.
