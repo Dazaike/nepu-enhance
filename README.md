@@ -19,6 +19,9 @@ A Chrome (Manifest V3) extension for [Nepu](https://nepu.to/) and its mirrors
   automatically each time you open a Nepu page, or on demand.
 - **New release tracking** — monitors TMDB for new TV episode air dates
   for your Watchlist shows and sends desktop notifications when new episodes air.
+- **Modern Netflix UI overhaul** — transforms Nepu (`nepu.to`, `nepu.is`, `nepu.net`)
+  with a sleek dark glassmorphism header, smooth poster card hover effects, cinema player styling,
+  and auto-cleared ad placeholders.
 ## Install (unpacked)
 
 1. Clone or download this repository.
@@ -86,8 +89,10 @@ desktop notifications when a new episode airs.
 - **Per-show opt-out:** Enable/disable release tracking for specific shows
   on the options page.
 - **Test notification button:** Click **Send test notification** on the options
-  page to test desktop notifications anytime.
-## Settings
+| Auto-sync with Dropbox | Sync automatically on every Nepu page open (see **Sync now** for a manual trigger) |
+| Track new episode releases | Background checks via TMDB for new TV episode air dates |
+| Desktop notifications | Send OS desktop notifications when new episodes air |
+| Modern Netflix UI on Nepu | Revamps Nepu with a dark glassmorphism layout, cinema player, and clean poster grids |
 
 Available from the popup's **Settings** tab and the full options page:
 
@@ -128,6 +133,8 @@ content/
   tracker.js            Continue Watching tracking + auto-resume
   subtitles.js           Subtitle search/download/style engine + on-page bookmark button
   home-rails.js           Continue Watching/Watchlist rails on the Nepu homepage
+  theme.js              Modern Netflix UI theme class toggler
+  theme.css             Modern Netflix UI glassmorphism stylesheet
 popup/                  Extension popup UI (Continue Watching, Watchlist, Subtitles, Settings)
 options/                Full-page settings + OpenSubtitles/TMDB API keys
 icons/

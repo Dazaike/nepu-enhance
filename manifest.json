@@ -37,7 +37,8 @@
         "https://nepu.is/*", "https://www.nepu.is/*",
         "https://nepu.net/*", "https://www.nepu.net/*"
       ],
-      "js": ["common/store.js", "common/nepu-title.js", "content/tracker.js", "content/subtitles.js", "content/home-rails.js"],
+      "css": ["content/theme.css"],
+      "js": ["common/store.js", "common/nepu-title.js", "content/theme.js", "content/tracker.js", "content/subtitles.js", "content/home-rails.js"],
       "run_at": "document_idle",
       "all_frames": false
     }

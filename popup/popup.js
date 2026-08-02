@@ -815,6 +815,7 @@
   const completedValueEl = document.getElementById('completed-value');
   const autoApplyToggle = document.getElementById('autoapply-toggle');
   const useTimeToggle = document.getElementById('usetime-toggle');
+  const modernUiToggle = document.getElementById('modernui-toggle');
   const dropboxAutoSyncToggle = document.getElementById('dropbox-autosync-toggle');
   const dropboxSyncNowBtn = document.getElementById('dropbox-sync-now-btn');
   const dropboxStatusEl = document.getElementById('dropbox-status');
@@ -828,6 +829,7 @@
     resumeToggle.checked = !!settings.resumeEnabled;
     autoApplyToggle.checked = !!settings.autoApplyCaptions;
     useTimeToggle.checked = !!settings.useTimeProgress;
+    modernUiToggle.checked = settings.nepuModernUi !== false;
     dropboxAutoSyncToggle.checked = settings.dropboxAutoSync !== false;
     minDurationInput.value = settings.minDurationSeconds;
     completedRange.value = Math.round((settings.completedThreshold || 0) * 100);
@@ -841,8 +843,13 @@
     });
     autoApplyToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ autoApplyCaptions: autoApplyToggle.checked });
-    });
     useTimeToggle.addEventListener('change', async () => {
+      state.settings = await NVT.setSettings({ useTimeProgress: useTimeToggle.checked });
+      renderContinue();
+    });
+    modernUiToggle.addEventListener('change', async () => {
+      state.settings = await NVT.setSettings({ nepuModernUi: modernUiToggle.checked });
+    });
       state.settings = await NVT.setSettings({ useTimeProgress: useTimeToggle.checked });
       renderContinue();
     });

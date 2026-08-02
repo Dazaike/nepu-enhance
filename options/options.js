@@ -13,6 +13,7 @@
   const resumeToggle = document.getElementById('resume-toggle');
   const autoApplyToggle = document.getElementById('autoapply-toggle');
   const useTimeToggle = document.getElementById('usetime-toggle');
+  const modernUiToggle = document.getElementById('modernui-toggle');
   const dropboxAutoSyncToggle = document.getElementById('dropbox-autosync-toggle');
   const relTrackToggle = document.getElementById('rel-track-toggle');
   const relNotifToggle = document.getElementById('rel-notif-toggle');
@@ -31,6 +32,7 @@
     resumeToggle.checked = !!settings.resumeEnabled;
     autoApplyToggle.checked = !!settings.autoApplyCaptions;
     useTimeToggle.checked = !!settings.useTimeProgress;
+    modernUiToggle.checked = settings.nepuModernUi !== false;
     dropboxAutoSyncToggle.checked = settings.dropboxAutoSync !== false;
     relTrackToggle.checked = !!settings.releaseTrackingEnabled;
     relNotifToggle.checked = !!settings.desktopNotificationsEnabled;
@@ -50,6 +52,9 @@
     });
     useTimeToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ useTimeProgress: useTimeToggle.checked });
+    });
+    modernUiToggle.addEventListener('change', async () => {
+      state.settings = await NVT.setSettings({ nepuModernUi: modernUiToggle.checked });
     });
     dropboxAutoSyncToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ dropboxAutoSync: dropboxAutoSyncToggle.checked });

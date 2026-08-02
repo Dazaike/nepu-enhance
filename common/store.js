@@ -39,6 +39,7 @@ const NVT = (() => {
     desktopNotificationsEnabled: true,
     releaseCheckIntervalHours: 12,
     releaseOptOutIds: [],
+    nepuModernUi: true,
     updatedAt: 0,
   });
 
