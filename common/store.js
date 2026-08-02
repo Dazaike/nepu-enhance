@@ -53,7 +53,9 @@ const NVT = (() => {
   // instead of leaving a stale duplicate behind. Non-episode paths (movies,
   // any other site) pass through unchanged.
   function normalizeEpisodePath(path) {
-    const p = path || '/';
+    let p = path || '/';
+    // Drop query/hash so ?server= / #frag don't fork history keys.
+    p = String(p).split('?')[0].split('#')[0] || '/';
     const m = p.match(/^(\/(?:show|tv)\/[^/]+)\/season\/\d+\/episode\/\d+\/?/i);
     return m ? m[1] : p;
   }

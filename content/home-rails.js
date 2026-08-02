@@ -12,6 +12,10 @@
 (function () {
   'use strict';
 
+  // Content scripts run with all_frames:true so the tracker can see iframe
+  // players; rails only belong on the top-level homepage document.
+  if (window !== window.top) return;
+
   const WRAPPER_ID = 'nvt-home-rails';
   let lastSignature = null;
 

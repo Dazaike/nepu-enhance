@@ -11,6 +11,11 @@
   // (MutationObserver callbacks, the fallback poll) never double-attach.
   const instrumented = new WeakSet();
 
+  // Per-video state so late duration / play events can still qualify a
+  // video that was discovered before metadata was ready (common with
+  // FluidPlayer / SPA embeds — first qualify() fails, then never retried).
+  const videoStates = new WeakMap();
+
   // Videos whose duration has qualified (finite, >= minDurationSeconds) and
   // therefore have active tracking listeners. Used by the visibilitychange
   // flush, which needs to enumerate currently-live videos.
@@ -68,9 +73,10 @@
     } catch (err) {
       console.debug('[NVT tracker] identifyTitle failed for identity', err);
     }
+    // Prefer pathname for stable history keys (search/hash often changes).
     return {
       host: location.hostname,
-      path: location.pathname + location.search,
+      path: location.pathname || '/',
       url: location.href,
       season,
       episode,
@@ -132,7 +138,13 @@
   }
 
   function setupVideo(video, settings) {
-    if (instrumented.has(video)) return;
+    // Already wired — but duration often arrives *after* first discovery.
+    // Retry qualify on every rescan so late metadata still enables tracking.
+    if (instrumented.has(video)) {
+      const existing = videoStates.get(video);
+      if (existing && typeof existing.qualify === 'function') existing.qualify();
+      return;
+    }
     instrumented.add(video);
 
     const state = {
@@ -140,6 +152,7 @@
       resumed: false,
       qualified: false,
     };
+    videoStates.set(video, state);
 
     async function maybeResume() {
       if (!settings.resumeEnabled || state.resumed) return;
@@ -195,38 +208,50 @@
     function qualify() {
       if (state.qualified) return;
       const duration = video.duration;
-      if (!Number.isFinite(duration) || duration < settings.minDurationSeconds) {
-        return;
-      }
+      // Some players report 0 / NaN until media is actually playing.
+      if (!Number.isFinite(duration) || duration <= 0) return;
+      // Soft floor: still respect setting, but treat very short clips only
+      // once we know duration. Default minDurationSeconds is 30.
+      if (duration < settings.minDurationSeconds) return;
+
       state.qualified = true;
       activeVideos.add(video);
       video.addEventListener('timeupdate', onTimeUpdate);
       video.addEventListener('pause', onPause);
       video.addEventListener('ended', onEnded);
+      // Immediate save once qualified if already past the progress threshold
+      // (user scrubbed / mid-play when we finally got duration).
+      if (!video.paused && video.currentTime > 0) {
+        persist(video);
+      }
       maybeResume();
     }
+    state.qualify = qualify;
 
+    // Players fire different readiness events; listen to all common ones.
     video.addEventListener('loadedmetadata', qualify);
-    // Metadata may already be available (e.g. a cached / fast-loading video
-    // discovered by a late scan), so check immediately too.
+    video.addEventListener('durationchange', qualify);
+    video.addEventListener('loadeddata', qualify);
+    video.addEventListener('canplay', qualify);
+    video.addEventListener('play', qualify);
+    video.addEventListener('playing', qualify);
+    // Metadata may already be available (cached / late scan).
     qualify();
   }
 
   // Nepu (and similar aggregators) frequently embed the actual player in a
   // same-origin iframe per "server"/source. Cross-origin iframes are simply
-  // unreachable from here (browser security), but same-origin ones aren't —
-  // reuse the same reachable-frame walk content/subtitles.js already relies
-  // on so Continue Watching keeps tracking regardless of which server the
-  // page embeds.
-  function sameOriginIframeDocs() {
+  // unreachable from here (browser security), but same-origin ones aren't.
+  function sameOriginIframeDocs(rootDoc) {
     const docs = [];
+    const base = rootDoc || document;
     try {
-      document.querySelectorAll('iframe').forEach((frame) => {
+      base.querySelectorAll('iframe').forEach((frame) => {
         try {
           const doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
           if (doc) docs.push(doc);
         } catch (_) {
-          /* cross-origin — inaccessible from the outer page, nothing to do */
+          /* cross-origin — inaccessible */
         }
       });
     } catch (_) {
@@ -235,20 +260,49 @@
     return docs;
   }
 
-  function scanForVideos(root, settings) {
-    try {
-      if (root.tagName === 'VIDEO') {
-        setupVideo(root, settings);
+  /** Collect <video> nodes including open shadow roots (FluidPlayer / custom). */
+  function collectVideos(root) {
+    const out = [];
+    const seen = new Set();
+
+    function add(v) {
+      if (v && v.tagName === 'VIDEO' && !seen.has(v)) {
+        seen.add(v);
+        out.push(v);
       }
-      if (typeof root.querySelectorAll === 'function') {
-        root.querySelectorAll('video').forEach((video) => {
-          setupVideo(video, settings);
-        });
-        if (root === document) {
-          sameOriginIframeDocs().forEach((doc) => {
-            doc.querySelectorAll('video').forEach((video) => setupVideo(video, settings));
+    }
+
+    function walk(node) {
+      if (!node) return;
+      try {
+        if (node.tagName === 'VIDEO') add(node);
+        if (node.querySelectorAll) {
+          node.querySelectorAll('video').forEach(add);
+          // Open shadow roots on custom elements
+          node.querySelectorAll('*').forEach((el) => {
+            if (el.shadowRoot) walk(el.shadowRoot);
           });
         }
+        if (node.shadowRoot) walk(node.shadowRoot);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+
+    walk(root);
+    return out;
+  }
+
+  function scanForVideos(root, settings) {
+    try {
+      if (!root) return;
+      collectVideos(root).forEach((video) => setupVideo(video, settings));
+
+      // Top-level document: also walk same-origin iframes (and their shadows).
+      if (root === document || root === document.documentElement || root === document.body) {
+        sameOriginIframeDocs(document).forEach((doc) => {
+          collectVideos(doc).forEach((video) => setupVideo(video, settings));
+        });
       }
     } catch (err) {
       console.debug('[NVT tracker] scan failed', err);
@@ -296,12 +350,11 @@
     });
 
     // Cheap, low-frequency defensive fallback: some custom/SPA players swap
-    // <video> src or attach it inside shadow DOM in ways the observer can
-    // miss, or never fire loadedmetadata reliably. Re-scanning is cheap —
-    // already-instrumented videos are skipped via the WeakSet guard.
+    // <video> src, put media in shadow DOM, or only set duration after play.
+    // Re-scanning is cheap; already-instrumented videos re-try qualify only.
     const fallbackTimer = setInterval(() => {
       scanForVideos(document, settings);
-    }, 5000);
+    }, 2500);
     window.addEventListener(
       'beforeunload',
       () => clearInterval(fallbackTimer),

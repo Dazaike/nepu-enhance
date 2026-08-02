@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Nepu Watch Tracker & Subtitles",
-  "version": "5.7.8",
+  "version": "5.7.9",
   "description": "Continue Watching, a Watchlist, and OpenSubtitles captions for Nepu (nepu.to / nepu.is / nepu.net).",
   "permissions": ["storage", "scripting", "activeTab", "tabs", "identity", "notifications", "alarms"],
   "host_permissions": [
@@ -40,7 +40,7 @@
       "css": ["content/theme.css"],
       "js": ["common/store.js", "common/nepu-title.js", "content/theme.js", "content/tracker.js", "content/subtitles.js", "content/home-rails.js"],
       "run_at": "document_idle",
-      "all_frames": false
+      "all_frames": true
     }
   ]
 }

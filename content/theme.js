@@ -9,6 +9,9 @@
 (function () {
   'use strict';
 
+  // Theme chrome is for the top page only (all_frames is enabled for tracking).
+  if (window !== window.top) return;
+
   function applyTheme(enabled) {
     if (enabled !== false) {
       document.documentElement.classList.add('nvt-modern-ui');
