@@ -1,6 +1,12 @@
 /* ==========================================================================
-   Nepu Modern UI Overhaul (Netflix / Plex Cinematic Theme)
-   Scoped strictly under .nvt-modern-ui so users can toggle it on/off.
+   Nepu Modern UI Overhaul (Netflix / Plex Style Theme)
+   Targeting the real DOM of nepu.is:
+   - Header: .app-header, .navbar, .app-navbar, .app-search, .video-search
+   - Card Grids: .col, .list-movie, .list-media, .media-cover, .list-caption, .list-title, .list-year
+   - Card Badges: .list-media-attr, .quality, .imdb
+   - Play Overlay: .play-btn
+   - Headings: .app-section, .app-heading, .text
+   - Rails: #nvt-home-rails, .nvt-rail-card, .nvt-rail-thumb
    ========================================================================== */
 
 .nvt-modern-ui {
@@ -8,198 +14,220 @@
   --nvt-bg-elevated: #131b2e;
   --nvt-bg-card: #182238;
   --nvt-border: rgba(255, 255, 255, 0.08);
-  --nvt-border-hover: rgba(59, 130, 246, 0.4);
+  --nvt-border-hover: rgba(59, 130, 246, 0.45);
   --nvt-text: #f1f5f9;
   --nvt-text-dim: #94a3b8;
   --nvt-accent: #2563eb;
+  --nvt-accent-hover: #3b82f6;
   --nvt-accent-glow: rgba(37, 99, 235, 0.35);
-  --nvt-glass: rgba(11, 15, 25, 0.82);
+  --nvt-glass: rgba(11, 15, 25, 0.85);
 }
 
-/* 1. Global Canvas & Typography */
+/* 1. Global Cinematic Canvas & Dark Background */
 html.nvt-modern-ui,
-.nvt-modern-ui body {
+.nvt-modern-ui body,
+.nvt-modern-ui .app,
+.nvt-modern-ui #app {
   background-color: var(--nvt-bg) !important;
   color: var(--nvt-text) !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, inter, "Helvetica Neue", Arial, sans-serif !important;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 /* 2. Glassmorphism Navigation / Header */
-.nvt-modern-ui header,
-.nvt-modern-ui nav,
-.nvt-modern-ui .navbar,
 .nvt-modern-ui .app-header {
   background: var(--nvt-glass) !important;
   backdrop-filter: blur(14px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(14px) saturate(180%) !important;
   border-bottom: 1px solid var(--nvt-border) !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5) !important;
 }
 
-/* Search bar styling in header */
-.nvt-modern-ui input[type="search"],
-.nvt-modern-ui input[type="text"].search-input,
-.nvt-modern-ui .search-box input {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border: 1px solid var(--nvt-border) !important;
+/* Search input in header */
+.nvt-modern-ui .video-search,
+.nvt-modern-ui .app-search input,
+.nvt-modern-ui .typeahead__field input {
+  background: rgba(255, 255, 255, 0.07) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
   border-radius: 20px !important;
   color: var(--nvt-text) !important;
   padding: 8px 16px !important;
+  font-size: 13px !important;
   transition: all 0.2s ease !important;
 }
 
-.nvt-modern-ui input[type="search"]:focus,
-.nvt-modern-ui input[type="text"].search-input:focus,
-.nvt-modern-ui .search-box input:focus {
-  background: rgba(255, 255, 255, 0.1) !important;
-  border-color: var(--nvt-accent) !important;
-  box-shadow: 0 0 12px var(--nvt-accent-glow) !important;
+.nvt-modern-ui .video-search:focus,
+.nvt-modern-ui .app-search input:focus,
+.nvt-modern-ui .typeahead__field input:focus {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: var(--nvt-accent-hover) !important;
+  box-shadow: 0 0 14px var(--nvt-accent-glow) !important;
   outline: none !important;
 }
 
-/* 3. Section Headings */
-.nvt-modern-ui .app-heading,
-.nvt-modern-ui .section-title,
-.nvt-modern-ui h2.heading {
-  display: flex !important;
-  align-items: center !important;
-  gap: 10px !important;
-  font-size: 15px !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.02em !important;
-  color: var(--nvt-text) !important;
+/* Search typeahead dropdown list */
+.nvt-modern-ui .typeahead__list {
+  background: var(--nvt-bg-elevated) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* 3. Section Headings (.app-heading & .text) */
+.nvt-modern-ui .app-heading {
   margin-bottom: 16px !important;
 }
 
-.nvt-modern-ui .app-heading .text::before,
-.nvt-modern-ui .section-title::before {
+.nvt-modern-ui .app-heading .text {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: #f8fafc !important;
+  letter-spacing: 0.02em !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.nvt-modern-ui .app-heading .text::before {
   content: "" !important;
   display: inline-block !important;
   width: 4px !important;
-  height: 16px !important;
+  height: 18px !important;
   background: var(--nvt-accent) !important;
   border-radius: 2px !important;
-  margin-right: 8px !important;
-  box-shadow: 0 0 8px var(--nvt-accent-glow) !important;
-  vertical-align: middle !important;
+  margin-right: 10px !important;
+  box-shadow: 0 0 10px var(--nvt-accent-glow) !important;
 }
 
-/* 4. Movie / TV Show Poster Cards (Grids) */
-.nvt-modern-ui .card,
-.nvt-modern-ui .film-item,
-.nvt-modern-ui .movie-item,
-.nvt-modern-ui .item,
-.nvt-modern-ui .poster-card {
+/* 4. Movie & TV Show Card Grids (.list-movie, .list-media, .media-cover) */
+.nvt-modern-ui .list-movie {
   border-radius: 10px !important;
   overflow: hidden !important;
-  background: var(--nvt-bg-card) !important;
+  background: var(--nvt-bg-elevated) !important;
   border: 1px solid var(--nvt-border) !important;
+  padding: 6px !important;
   transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.22s ease !important;
 }
 
-.nvt-modern-ui .card:hover,
-.nvt-modern-ui .film-item:hover,
-.nvt-modern-ui .movie-item:hover,
-.nvt-modern-ui .item:hover,
-.nvt-modern-ui .poster-card:hover {
+.nvt-modern-ui .list-movie:hover {
   transform: translateY(-5px) scale(1.025) !important;
   border-color: var(--nvt-border-hover) !important;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.65), 0 0 16px var(--nvt-accent-glow) !important;
-  z-index: 10 !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7), 0 0 16px var(--nvt-accent-glow) !important;
+  z-index: 20 !important;
 }
 
-.nvt-modern-ui .card img,
-.nvt-modern-ui .film-item img,
-.nvt-modern-ui .movie-item img,
-.nvt-modern-ui .item img {
+.nvt-modern-ui .list-media {
+  position: relative !important;
   border-radius: 8px !important;
-  transition: opacity 0.2s ease !important;
-}
-
-/* 5. Video Detail & Cinema Player Section */
-.nvt-modern-ui .app-detail,
-.nvt-modern-ui .detail-container,
-.nvt-modern-ui .player-container,
-.nvt-modern-ui .watch-container {
-  background: rgba(19, 27, 46, 0.5) !important;
-  border-radius: 14px !important;
-  border: 1px solid var(--nvt-border) !important;
-  padding: 16px !important;
-  backdrop-filter: blur(8px) !important;
-}
-
-/* Player shadow / glow */
-.nvt-modern-ui #player-holder,
-.nvt-modern-ui .player-holder,
-.nvt-modern-ui .fluid_video_wrapper,
-.nvt-modern-ui iframe[src*="player"],
-.nvt-modern-ui video {
-  border-radius: 12px !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 1px rgba(255, 255, 255, 0.15) !important;
   overflow: hidden !important;
+  display: block !important;
 }
 
-/* Action buttons (Like, Dislike, Share, etc.) */
-.nvt-modern-ui .action-btn {
+.nvt-modern-ui .media.media-cover,
+.nvt-modern-ui .media.media-episode {
   border-radius: 8px !important;
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid var(--nvt-border) !important;
-  color: var(--nvt-text-dim) !important;
-  padding: 6px 14px !important;
-  font-weight: 600 !important;
-  font-size: 12px !important;
-  transition: all 0.15s ease !important;
+  transition: transform 0.25s ease !important;
 }
 
-.nvt-modern-ui .action-btn:hover {
-  background: rgba(37, 99, 235, 0.18) !important;
-  border-color: var(--nvt-accent) !important;
-  color: var(--nvt-text) !important;
-  transform: translateY(-1px) !important;
+.nvt-modern-ui .list-movie:hover .media.media-cover,
+.nvt-modern-ui .list-movie:hover .media.media-episode {
+  transform: scale(1.04) !important;
 }
 
-/* Episode Selector Cards / Grid */
-.nvt-modern-ui .episodes-list,
-.nvt-modern-ui .ss-list,
-.nvt-modern-ui .eps-grid {
+/* Quality Tag & IMDb Score Overlay Badges */
+.nvt-modern-ui .list-media-attr {
+  position: absolute !important;
+  top: 6px !important;
+  left: 6px !important;
+  right: 6px !important;
   display: flex !important;
-  flex-wrap: wrap !important;
-  gap: 8px !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  pointer-events: none !important;
+  z-index: 5 !important;
 }
 
-.nvt-modern-ui .ep-item,
-.nvt-modern-ui .episode-btn,
-.nvt-modern-ui .ss-item {
-  background: rgba(255, 255, 255, 0.04) !important;
-  border: 1px solid var(--nvt-border) !important;
-  border-radius: 8px !important;
-  color: var(--nvt-text-dim) !important;
-  padding: 8px 14px !important;
-  font-size: 12px !important;
-  font-weight: 600 !important;
-  transition: all 0.15s ease !important;
+.nvt-modern-ui .quality {
+  background: rgba(11, 15, 25, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 2px 6px !important;
+  color: #60a5fa !important;
 }
 
-.nvt-modern-ui .ep-item:hover,
-.nvt-modern-ui .episode-btn:hover,
-.nvt-modern-ui .ss-item:hover {
-  background: rgba(37, 99, 235, 0.2) !important;
-  border-color: var(--nvt-accent) !important;
-  color: var(--nvt-text) !important;
+.nvt-modern-ui .imdb {
+  background: rgba(11, 15, 25, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 2px 6px !important;
+  color: #fbbf24 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important;
 }
 
-.nvt-modern-ui .ep-item.active,
-.nvt-modern-ui .episode-btn.active,
-.nvt-modern-ui .ss-item.active {
+.nvt-modern-ui .imdb svg {
+  display: none !important; /* Hide redundant SVG circle ring */
+}
+
+.nvt-modern-ui .imdb::before {
+  content: "★" !important;
+  font-size: 10px !important;
+}
+
+/* Play button hover overlay */
+.nvt-modern-ui .play-btn {
+  background: rgba(37, 99, 235, 0.85) !important;
+  border-radius: 50% !important;
+  width: 44px !important;
+  height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 0 20px rgba(37, 99, 235, 0.6) !important;
+  transition: transform 0.2s ease, background-color 0.2s ease !important;
+}
+
+.nvt-modern-ui .list-movie:hover .play-btn {
+  transform: translate(-50%, -50%) scale(1.1) !important;
   background: var(--nvt-accent) !important;
-  border-color: var(--nvt-accent) !important;
-  color: #ffffff !important;
-  box-shadow: 0 0 12px var(--nvt-accent-glow) !important;
 }
 
-/* 6. Clean up known ad containers / empty banners */
+/* Caption / Title below poster */
+.nvt-modern-ui .list-caption {
+  padding: 8px 4px 4px !important;
+}
+
+.nvt-modern-ui .list-title {
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: var(--nvt-text) !important;
+  line-height: 1.35 !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  word-break: break-word !important;
+  transition: color 0.15s ease !important;
+}
+
+.nvt-modern-ui .list-movie:hover .list-title {
+  color: #60a5fa !important;
+}
+
+.nvt-modern-ui .list-year,
+.nvt-modern-ui .list-category {
+  font-size: 11px !important;
+  color: var(--nvt-text-dim) !important;
+  margin-top: 2px !important;
+}
+
+/* 5. Clean up ad placeholders & broken promo containers */
 .nvt-modern-ui div[class*="ad-box"],
 .nvt-modern-ui div[class*="banner-ad"],
 .nvt-modern-ui div[id*="pop-ad"],
@@ -207,7 +235,7 @@ html.nvt-modern-ui,
   display: none !important;
 }
 
-/* 7. Sleek Scrollbars */
+/* 6. Sleek Scrollbars */
 .nvt-modern-ui ::-webkit-scrollbar {
   width: 6px !important;
   height: 6px !important;
@@ -218,7 +246,7 @@ html.nvt-modern-ui,
 }
 
 .nvt-modern-ui ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15) !important;
+  background: rgba(255, 255, 255, 0.18) !important;
   border-radius: 3px !important;
 }
 
