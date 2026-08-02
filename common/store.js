@@ -192,10 +192,17 @@ const NVT = (() => {
 
   async function listWatchlist(includeDeleted = false) {
     const all = await chrome.storage.local.get(null);
-    return Object.keys(all)
+    const items = Object.keys(all)
       .filter((k) => k.startsWith(WL_PREFIX))
       .map((k) => all[k])
       .filter((item) => item && (includeDeleted || !item.deleted));
+
+    for (const item of items) {
+      if (item && item.mediaType !== 'tv' && (/\/(?:show|tv)\//i.test(item.path || '') || /\/(?:show|tv)\//i.test(item.url || ''))) {
+        item.mediaType = 'tv';
+      }
+    }
+    return items;
   }
 
   async function getWatchlistFor(host, path) {

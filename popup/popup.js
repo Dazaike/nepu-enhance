@@ -378,7 +378,7 @@
         poster: scraped.image || '',
         season: se.season,
         episode: se.episode,
-        mediaType: se.season != null ? 'tv' : 'movie',
+        mediaType: (se.season != null || /\/(?:show|tv)\//i.test(tab.url)) ? 'tv' : 'movie',
       });
       renderWatchlist();
     } catch (err) {

@@ -2058,6 +2058,7 @@
       } else {
         const identified = identifyTitle();
         const hasSe = identified.season != null && identified.episode != null;
+        const isTv = hasSe || identified.mediaType === 'tv' || /\/(?:show|tv)\//i.test(location.pathname);
         const title = identified.title || document.title;
         const poster = metaContent('meta[property="og:image"]');
         await NVT.addWatchlist({
@@ -2068,7 +2069,7 @@
           poster: poster || '',
           season: hasSe ? identified.season : null,
           episode: hasSe ? identified.episode : null,
-          mediaType: hasSe ? 'tv' : 'movie',
+          mediaType: isTv ? 'tv' : 'movie',
         });
       }
       await updateWatchlistButtonState(btn);

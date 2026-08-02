@@ -96,12 +96,14 @@ function parseNepuSlug(pathname) {
     ? [title, se].filter(Boolean).join(' ').trim()
     : [title, year].filter(Boolean).join(' ').trim();
 
+  const isTvUrl = /\/(?:show|tv)\//i.test(path);
   return {
     title: title || '',
     year: year || '',
     season: fromSlugText.season,
     episode: fromSlugText.episode,
-    kind: fromSlugText.season != null ? 'episode' : 'movie',
+    kind: fromSlugText.season != null ? 'episode' : (isTvUrl ? 'tv' : 'movie'),
+    mediaType: (fromSlugText.season != null || isTvUrl) ? 'tv' : 'movie',
     query,
   };
 }
@@ -220,7 +222,8 @@ function identifyTitle() {
     tmdbId: '',
     season,
     episode,
-    kind: season != null && episode != null ? 'episode' : 'movie',
+    kind: season != null && episode != null ? 'episode' : (/\/(?:show|tv)\//i.test(location.pathname) ? 'tv' : 'movie'),
+    mediaType: (season != null || (fromSlug && (fromSlug.kind === 'tv' || fromSlug.mediaType === 'tv')) || /\/(?:show|tv)\//i.test(location.pathname)) ? 'tv' : 'movie',
     source: fromSlug && fromSlug.season != null
       ? 'url-slug'
       : fromLd
