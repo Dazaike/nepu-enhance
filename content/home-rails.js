@@ -84,9 +84,6 @@
         font-weight: 700;
         box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);
       }
-        background: rgba(0, 0, 0, 0.6);
-        color: #fff;
-      }
       .nvt-rail-title {
         font-size: 12.5px;
         margin-top: 6px;
@@ -112,12 +109,17 @@
     return location.pathname === '/' || location.pathname === '';
   }
 
-  /** First ".app-heading" on the page that isn't part of our own wrapper. */
+  /** First top-level ".app-section" whose heading isn't part of our own
+   * wrapper — anchoring on the section (not the bare heading) means our
+   * rail becomes its own sibling section instead of nesting inside the
+   * first "Latest ..." section (real nepu.is DOM: .app-heading is a
+   * direct child of .app-section, alongside the row/grid). */
   function findAnchor() {
     if (!isHomePage()) return null;
     const headings = document.querySelectorAll('.app-heading');
     for (const h of headings) {
-      if (!h.closest('#' + WRAPPER_ID)) return h;
+      if (h.closest('#' + WRAPPER_ID)) continue;
+      return h.closest('.app-section') || h;
     }
     return null;
   }

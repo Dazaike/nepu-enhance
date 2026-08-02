@@ -23,6 +23,18 @@
   --nvt-glass: rgba(11, 15, 25, 0.85);
 }
 
+/* nepu.is defines its own site-wide accent as `--theme-color: #c700a6`
+   (pink/magenta) on `:root`, referenced ~113 times across search hover,
+   scrollbar thumbs, watchlist badges, and - critically - the Plyr video
+   player (play button, progress bar fill via currentColor, menu check
+   marks). Overriding it here (higher specificity than the page's own
+   `:root` rule since this targets `html.nvt-modern-ui`) retints all of
+   that to match the rest of the extension's blue theme in one shot. */
+html.nvt-modern-ui {
+  --theme-color: var(--nvt-accent) !important;
+  --button-color: var(--nvt-accent) !important;
+}
+
 /* 1. Global Cinematic Canvas & Dark Background */
 html.nvt-modern-ui,
 .nvt-modern-ui body,
@@ -252,4 +264,77 @@ html.nvt-modern-ui,
 
 .nvt-modern-ui ::-webkit-scrollbar-thumb:hover {
   background: var(--nvt-accent) !important;
+}
+
+/* 7. Video Player Overhaul (Plyr.js - confirmed via real DOM/CSS:
+   .plyr, .plyr__controls, .plyr__control, .plyr__progress, .plyr__menu)
+   Colors already retint to blue via the --theme-color override above
+   (play button, progress fill, menu checkmarks); this section reshapes
+   the chrome itself for a cleaner, more cinematic control bar. */
+.nvt-modern-ui .plyr {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6) !important;
+}
+
+.nvt-modern-ui .plyr__controls {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.55) 60%, transparent 100%) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  padding: 20px 12px 10px !important;
+}
+
+.nvt-modern-ui .plyr__control {
+  border-radius: 8px !important;
+  transition: background-color 0.15s ease, transform 0.15s ease !important;
+}
+
+.nvt-modern-ui .plyr__control:hover {
+  background: var(--nvt-accent) !important;
+  transform: translateY(-1px) !important;
+}
+
+.nvt-modern-ui .plyr__control--overlaid {
+  box-shadow: 0 0 0 0 var(--nvt-accent-glow), 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.nvt-modern-ui .plyr__control--overlaid:hover {
+  transform: translate(-50%, -50%) scale(1.08) !important;
+  box-shadow: 0 0 0 10px var(--nvt-accent-glow), 0 8px 28px rgba(0, 0, 0, 0.65) !important;
+}
+
+.nvt-modern-ui .plyr__progress input[type="range"] {
+  height: 6px !important;
+}
+
+.nvt-modern-ui .plyr__progress__buffer {
+  border-radius: 100px !important;
+}
+
+.nvt-modern-ui .plyr__tooltip {
+  background: var(--nvt-bg-elevated) !important;
+  border: 1px solid var(--nvt-border) !important;
+  color: var(--nvt-text) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+.nvt-modern-ui .plyr__tooltip::before {
+  border-top-color: var(--nvt-bg-elevated) !important;
+}
+
+.nvt-modern-ui .plyr__menu__container {
+  background: var(--nvt-bg-elevated) !important;
+  border: 1px solid var(--nvt-border) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65) !important;
+}
+
+.nvt-modern-ui .plyr__menu__container .plyr__control {
+  color: var(--nvt-text) !important;
+}
+
+.nvt-modern-ui .plyr__menu__container .plyr__control:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
 }
