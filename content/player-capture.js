@@ -45,7 +45,7 @@
 
   debug('player-capture.js installed on ' + location.href);
 
-  const VIDEO_URL_RE = /\.(m3u8|mp4|webm|mkv)(\?|#|$)/i;
+  const VIDEO_URL_RE = /(m3u8|mp4|webm|mkv|\/hls\/|\/stream\/|master|playlist)/i;
   let reported = false;
 
   function report(url, source) {

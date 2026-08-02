@@ -55,27 +55,28 @@
     document.head.appendChild(css);
 
     const script = document.createElement('script');
-    script.type = 'module';
     script.src = chrome.runtime.getURL('vendor/vidstack/vidstack.min.js');
     script.onerror = () => log('FAILED to load vendor/vidstack/vidstack.min.js - check web_accessible_resources');
     document.head.appendChild(script);
-    log('injected vidstack assets (css + module script)');
+    log('injected vidstack assets (css + script)');
   }
 
   /** Walk up from the <video> to find the widest reasonable wrapper to
-   * hide (FluidPlayer typically wraps the video in a few nested divs);
+   * hide (FluidPlayer typically wraps the video in .fluid_video_wrapper);
    * stop climbing once we would leave the immediate player area. */
   function findPlayerWrapper(video) {
+    if (!video) return null;
+    const fp = video.closest('.fluid_video_wrapper, [class*="fluid_video"], pjsdiv, [class*="player-container"]');
+    if (fp) return fp;
     let el = video;
     for (let i = 0; i < 4 && el.parentElement; i++) {
       const parent = el.parentElement;
-      // Stop climbing once the parent holds more than just the player
-      // (e.g. the page body/main content wrapper).
-      if (parent.children.length > 3) break;
+      if (parent.children.length > 4) break;
       el = parent;
     }
     return el;
   }
+
 
   function mount(url, video) {
     if (mounted) return;
