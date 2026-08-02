@@ -13,6 +13,7 @@
   const resumeToggle = document.getElementById('resume-toggle');
   const autoApplyToggle = document.getElementById('autoapply-toggle');
   const useTimeToggle = document.getElementById('usetime-toggle');
+  const dropboxAutoSyncToggle = document.getElementById('dropbox-autosync-toggle');
   const minDurationInput = document.getElementById('min-duration-input');
   const completedRange = document.getElementById('completed-range');
   const completedValueEl = document.getElementById('completed-value');
@@ -27,6 +28,7 @@
     resumeToggle.checked = !!settings.resumeEnabled;
     autoApplyToggle.checked = !!settings.autoApplyCaptions;
     useTimeToggle.checked = !!settings.useTimeProgress;
+    dropboxAutoSyncToggle.checked = settings.dropboxAutoSync !== false;
     minDurationInput.value = settings.minDurationSeconds;
     completedRange.value = Math.round((settings.completedThreshold || 0) * 100);
     completedValueEl.textContent = completedRange.value;
@@ -42,6 +44,9 @@
     });
     useTimeToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ useTimeProgress: useTimeToggle.checked });
+    });
+    dropboxAutoSyncToggle.addEventListener('change', async () => {
+      state.settings = await NVT.setSettings({ dropboxAutoSync: dropboxAutoSyncToggle.checked });
     });
     minDurationInput.addEventListener('change', async () => {
       const v = Math.max(0, Math.round(Number(minDurationInput.value) || 0));
@@ -122,6 +127,155 @@
 
   refreshSubAuthStatus().catch((err) => {
     console.error('[Nepu Watch Tracker] subtitle auth status failed:', err);
+  });
+
+  // -------------------------------------------------------------------
+  // Dropbox sync — background.js owns token refresh + the actual
+  // upload/download (it has the CORS-exempt host_permissions); the
+  // OAuth 2.0 PKCE authorize/exchange handshake runs here since
+  // chrome.identity works from any extension page, not just background.
+  // -------------------------------------------------------------------
+  const dropboxRedirectInput = document.getElementById('dropbox-redirect-uri');
+  const dropboxCopyRedirectBtn = document.getElementById('dropbox-copy-redirect-btn');
+  const dropboxAppKeyInput = document.getElementById('dropbox-appkey-input');
+  const dropboxConnectBtn = document.getElementById('dropbox-connect-btn');
+  const dropboxDisconnectBtn = document.getElementById('dropbox-disconnect-btn');
+  const dropboxSyncNowBtn = document.getElementById('dropbox-sync-now-btn');
+  const dropboxStatusEl = document.getElementById('dropbox-status');
+
+  dropboxRedirectInput.value = chrome.identity.getRedirectURL();
+
+  function setDropboxStatus(message, kind) {
+    dropboxStatusEl.textContent = message;
+    dropboxStatusEl.style.color = kind === 'error' ? '#fca5a5' : kind === 'ok' ? '#8dffb0' : '';
+  }
+
+  function base64UrlEncode(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function randomPkceVerifier() {
+    const arr = new Uint8Array(32);
+    crypto.getRandomValues(arr);
+    return base64UrlEncode(arr.buffer);
+  }
+
+  async function pkceChallengeFor(verifier) {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+    return base64UrlEncode(digest);
+  }
+
+  function requestDropboxSync(force) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: 'DROPBOX_SYNC', payload: { force: !!force } }, (res) => {
+        resolve(res || { ok: false, error: 'No response from the extension background.' });
+      });
+    });
+  }
+
+  async function refreshDropboxStatus() {
+    const [auth, sync] = await Promise.all([NVT.getDropboxAuth(), NVT.getSyncStatus()]);
+    dropboxAppKeyInput.value = auth.appKey || '';
+    const connected = !!auth.refreshToken;
+    dropboxDisconnectBtn.disabled = !connected;
+    dropboxSyncNowBtn.disabled = !connected;
+
+    const bits = [connected ? 'Connected to Dropbox' : 'Not connected'];
+    if (sync.syncing) {
+      bits.push('syncing…');
+    } else if (sync.lastSyncAt) {
+      bits.push(`last synced ${new Date(sync.lastSyncAt).toLocaleString()}`);
+    }
+    if (sync.lastSyncOk === false && sync.lastSyncError) bits.push(`error: ${sync.lastSyncError}`);
+    setDropboxStatus(bits.join(' · '), sync.lastSyncOk === false ? 'error' : connected ? 'ok' : 'warn');
+  }
+
+  dropboxCopyRedirectBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(dropboxRedirectInput.value);
+      setDropboxStatus('Redirect URI copied.', 'ok');
+    } catch (err) {
+      dropboxRedirectInput.select();
+      document.execCommand('copy');
+    }
+  });
+
+  dropboxConnectBtn.addEventListener('click', async () => {
+    const appKey = dropboxAppKeyInput.value.trim();
+    if (!appKey) {
+      setDropboxStatus('Paste your Dropbox App key first.', 'error');
+      return;
+    }
+    setDropboxStatus('Opening Dropbox authorization…', 'info');
+    try {
+      const verifier = randomPkceVerifier();
+      const challenge = await pkceChallengeFor(verifier);
+      const redirectUri = chrome.identity.getRedirectURL();
+      const authUrl = new URL('https://www.dropbox.com/oauth2/authorize');
+      authUrl.searchParams.set('client_id', appKey);
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('token_access_type', 'offline');
+      authUrl.searchParams.set('redirect_uri', redirectUri);
+      authUrl.searchParams.set('code_challenge', challenge);
+      authUrl.searchParams.set('code_challenge_method', 'S256');
+
+      const resultUrl = await chrome.identity.launchWebAuthFlow({
+        url: authUrl.toString(),
+        interactive: true,
+      });
+      const code = new URL(resultUrl).searchParams.get('code');
+      if (!code) throw new Error('Dropbox authorization was cancelled.');
+
+      const tokenResp = await fetch('https://api.dropboxapi.com/oauth2/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          grant_type: 'authorization_code',
+          client_id: appKey,
+          redirect_uri: redirectUri,
+          code_verifier: verifier,
+        }),
+      });
+      if (!tokenResp.ok) throw new Error(`Dropbox token exchange failed (HTTP ${tokenResp.status}).`);
+      const body = await tokenResp.json();
+      await NVT.setDropboxAuth({
+        appKey,
+        accessToken: body.access_token,
+        refreshToken: body.refresh_token,
+        expiresAt: Date.now() + (body.expires_in || 14400) * 1000,
+      });
+      setDropboxStatus('Connected — running first sync…', 'ok');
+      await requestDropboxSync(true);
+    } catch (err) {
+      setDropboxStatus((err && err.message) || 'Dropbox connection failed.', 'error');
+    } finally {
+      await refreshDropboxStatus();
+    }
+  });
+
+  dropboxDisconnectBtn.addEventListener('click', async () => {
+    await NVT.clearDropboxAuth();
+    setDropboxStatus('Disconnected from Dropbox.', 'ok');
+    await refreshDropboxStatus();
+  });
+
+  dropboxSyncNowBtn.addEventListener('click', async () => {
+    setDropboxStatus('Syncing…', 'info');
+    dropboxSyncNowBtn.disabled = true;
+    try {
+      const res = await requestDropboxSync(true);
+      setDropboxStatus(res.ok ? 'Synced just now.' : (res.error || 'Sync failed.'), res.ok ? 'ok' : 'error');
+    } finally {
+      await refreshDropboxStatus();
+    }
+  });
+
+  refreshDropboxStatus().catch((err) => {
+    console.error('[Nepu Watch Tracker] dropbox status failed:', err);
   });
 
   initSettings().catch((err) => {

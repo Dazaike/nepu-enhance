@@ -806,6 +806,9 @@
   const completedValueEl = document.getElementById('completed-value');
   const autoApplyToggle = document.getElementById('autoapply-toggle');
   const useTimeToggle = document.getElementById('usetime-toggle');
+  const dropboxAutoSyncToggle = document.getElementById('dropbox-autosync-toggle');
+  const dropboxSyncNowBtn = document.getElementById('dropbox-sync-now-btn');
+  const dropboxStatusEl = document.getElementById('dropbox-status');
   const openOptionsBtn = document.getElementById('open-options-btn');
 
   async function initSettings() {
@@ -816,6 +819,7 @@
     resumeToggle.checked = !!settings.resumeEnabled;
     autoApplyToggle.checked = !!settings.autoApplyCaptions;
     useTimeToggle.checked = !!settings.useTimeProgress;
+    dropboxAutoSyncToggle.checked = settings.dropboxAutoSync !== false;
     minDurationInput.value = settings.minDurationSeconds;
     completedRange.value = Math.round((settings.completedThreshold || 0) * 100);
     completedValueEl.textContent = completedRange.value;
@@ -833,6 +837,9 @@
       state.settings = await NVT.setSettings({ useTimeProgress: useTimeToggle.checked });
       renderContinue();
     });
+    dropboxAutoSyncToggle.addEventListener('change', async () => {
+      state.settings = await NVT.setSettings({ dropboxAutoSync: dropboxAutoSyncToggle.checked });
+    });
     minDurationInput.addEventListener('change', async () => {
       const v = Math.max(0, Math.round(Number(minDurationInput.value) || 0));
       minDurationInput.value = v;
@@ -848,6 +855,42 @@
     openOptionsBtn.addEventListener('click', () => chrome.runtime.openOptionsPage());
   }
 
+  function renderDropboxStatus(sync, connected) {
+    const bits = [];
+    if (!connected) {
+      bits.push('Not connected — set up Dropbox in the extension Options page');
+    } else if (sync.syncing) {
+      bits.push('Syncing…');
+    } else if (sync.lastSyncAt) {
+      bits.push(`Synced ${relativeTime(sync.lastSyncAt)}`);
+    } else {
+      bits.push('Not synced yet');
+    }
+    if (sync.lastSyncOk === false && sync.lastSyncError) bits.push(sync.lastSyncError);
+    dropboxStatusEl.textContent = bits.join(' · ');
+    dropboxStatusEl.dataset.kind = sync.lastSyncOk === false ? 'error' : connected ? 'ok' : 'warn';
+  }
+
+  async function refreshDropboxStatus() {
+    const [auth, sync] = await Promise.all([NVT.getDropboxAuth(), NVT.getSyncStatus()]);
+    const connected = !!auth.refreshToken;
+    dropboxSyncNowBtn.disabled = !connected;
+    renderDropboxStatus(sync, connected);
+  }
+
+  dropboxSyncNowBtn.addEventListener('click', async () => {
+    dropboxSyncNowBtn.disabled = true;
+    dropboxStatusEl.textContent = 'Syncing…';
+    dropboxStatusEl.dataset.kind = 'info';
+    try {
+      await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: 'DROPBOX_SYNC', payload: { force: true } }, resolve);
+      });
+    } finally {
+      await refreshDropboxStatus();
+    }
+  });
+
   // ---------------------------------------------------------------------
   // Boot
   // ---------------------------------------------------------------------
@@ -857,6 +900,7 @@
   // show up until you closed and reopened the popup.
   let historyRefreshTimer = null;
   let watchlistRefreshTimer = null;
+  let dropboxStatusRefreshTimer = null;
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     const keys = Object.keys(changes);
@@ -868,6 +912,10 @@
       clearTimeout(watchlistRefreshTimer);
       watchlistRefreshTimer = setTimeout(renderWatchlist, 200);
     }
+    if (keys.some((k) => k === NVT.SYNC_STATUS_KEY || k.startsWith('dropbox:'))) {
+      clearTimeout(dropboxStatusRefreshTimer);
+      dropboxStatusRefreshTimer = setTimeout(refreshDropboxStatus, 200);
+    }
   });
 
   async function boot() {
@@ -875,7 +923,7 @@
     continueViewToggle.setActive(continueViewMode);
     watchlistViewMode = await getViewMode('watchlist');
     watchlistViewToggle.setActive(watchlistViewMode);
-    await Promise.all([renderContinue(), renderWatchlist(), initSettings()]);
+    await Promise.all([renderContinue(), renderWatchlist(), initSettings(), refreshDropboxStatus()]);
   }
 
   boot().catch((err) => {

@@ -59,3 +59,24 @@
   flex-wrap: wrap;
   margin-top: 12px;
 }
+
+.setup-steps {
+  color: var(--text-dim);
+  font-size: 12.5px;
+  line-height: 1.7;
+  margin: 8px 0 14px;
+  padding-left: 20px;
+}
+
+.setup-steps code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 11.5px;
+}
+
+#dropbox-redirect-uri {
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+}

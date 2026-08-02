@@ -255,8 +255,29 @@
     }
   }
 
+  /**
+   * "Sync every time you open the website": background.js itself throttles
+   * actual network calls (at most once every 5 minutes) and no-ops
+   * entirely when Dropbox isn't connected, so firing this on every page
+   * load here is cheap — it's independent of the trackingEnabled toggle,
+   * since syncing and watch-tracking are separate features.
+   */
+  function maybeSyncDropbox(settings) {
+    try {
+      if (settings.dropboxAutoSync === false) return;
+      chrome.runtime.sendMessage({ type: 'DROPBOX_SYNC' }, () => {
+        if (chrome.runtime.lastError) {
+          console.debug('[NVT tracker] dropbox sync message failed', chrome.runtime.lastError.message);
+        }
+      });
+    } catch (err) {
+      console.debug('[NVT tracker] dropbox sync trigger failed', err);
+    }
+  }
+
   async function main() {
     const settings = await NVT.getSettings();
+    maybeSyncDropbox(settings);
     if (!settings.trackingEnabled) return;
 
     scanForVideos(document, settings);

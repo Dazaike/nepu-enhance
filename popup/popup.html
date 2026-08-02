@@ -241,6 +241,18 @@
           <span class="switch-slider"></span>
         </label>
       </div>
+      <div class="setting-row">
+        <label class="switch-label" for="dropbox-autosync-toggle">Auto-sync with Dropbox</label>
+        <label class="switch">
+          <input type="checkbox" id="dropbox-autosync-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <span class="switch-label">Manual Dropbox sync</span>
+        <button type="button" id="dropbox-sync-now-btn" class="btn btn-secondary btn-sm">Sync now</button>
+      </div>
+      <div id="dropbox-status" class="status" data-kind="info"></div>
       <div class="setting-row column">
         <label for="min-duration-input">Minimum video length to track (seconds)</label>
         <input type="number" id="min-duration-input" min="0" step="1" />

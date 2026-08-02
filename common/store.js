@@ -16,6 +16,14 @@ const NVT = (() => {
   const WL_PREFIX = 'wl:';
   const SETTINGS_KEY = 'settings';
   const SUB_AUTH_KEYS = ['sub:osApiKey', 'sub:tmdbApiKey'];
+  const DROPBOX_AUTH_KEYS = [
+    'dropbox:appKey',
+    'dropbox:accessToken',
+    'dropbox:refreshToken',
+    'dropbox:expiresAt',
+    'dropbox:accountEmail',
+  ];
+  const SYNC_STATUS_KEY = 'dropboxSyncStatus';
 
   const DEFAULT_SETTINGS = Object.freeze({
     trackingEnabled: true,
@@ -25,6 +33,8 @@ const NVT = (() => {
     completedThreshold: 0.92,
     autoApplyCaptions: false,
     useTimeProgress: false,
+    dropboxAutoSync: true,
+    updatedAt: 0,
   });
 
   // Nepu episode pages look like "/show/<slug>/season/<n>/episode/<n>" — a
@@ -50,7 +60,7 @@ const NVT = (() => {
 
   async function setSettings(patch) {
     const cur = await getSettings();
-    const next = { ...cur, ...patch };
+    const next = { ...cur, ...patch, updatedAt: Date.now() };
     await chrome.storage.local.set({ [SETTINGS_KEY]: next });
     return next;
   }
@@ -67,6 +77,18 @@ const NVT = (() => {
     };
     await chrome.storage.local.set({ [key]: merged });
     return merged;
+  }
+
+  /**
+   * Writes an entry exactly as given — no auto-`updatedAt` stamp. Used by
+   * the Dropbox sync merge (background.js), which must preserve whichever
+   * side's timestamp actually won the merge instead of always bumping it
+   * to "now" on every write-through.
+   */
+  async function putHistoryRaw(entry) {
+    if (!entry || !entry.id) return null;
+    await chrome.storage.local.set({ [HIST_PREFIX + entry.id]: entry });
+    return entry;
   }
 
   async function getHistoryFor(host, path) {
@@ -98,6 +120,13 @@ const NVT = (() => {
     const key = WL_PREFIX + id;
     const entry = { ...item, id, addedAt: Date.now() };
     await chrome.storage.local.set({ [key]: entry });
+    return entry;
+  }
+
+  /** Same rationale as putHistoryRaw — no auto-`addedAt` stamp. */
+  async function putWatchlistRaw(entry) {
+    if (!entry || !entry.id) return null;
+    await chrome.storage.local.set({ [WL_PREFIX + entry.id]: entry });
     return entry;
   }
 
@@ -145,26 +174,85 @@ const NVT = (() => {
     return getSubtitleAuth();
   }
 
+  /**
+   * Dropbox OAuth state (PKCE, no client secret). The App Key is entered
+   * once on the options page; access/refresh tokens come from the OAuth
+   * exchange there and are refreshed by background.js as needed.
+   */
+  async function getDropboxAuth() {
+    const res = await chrome.storage.local.get(DROPBOX_AUTH_KEYS);
+    return {
+      appKey: res['dropbox:appKey'] || '',
+      accessToken: res['dropbox:accessToken'] || '',
+      refreshToken: res['dropbox:refreshToken'] || '',
+      expiresAt: res['dropbox:expiresAt'] || 0,
+      accountEmail: res['dropbox:accountEmail'] || '',
+    };
+  }
+
+  async function setDropboxAuth(patch) {
+    const map = {};
+    if (patch.appKey !== undefined) map['dropbox:appKey'] = patch.appKey;
+    if (patch.accessToken !== undefined) map['dropbox:accessToken'] = patch.accessToken;
+    if (patch.refreshToken !== undefined) map['dropbox:refreshToken'] = patch.refreshToken;
+    if (patch.expiresAt !== undefined) map['dropbox:expiresAt'] = patch.expiresAt;
+    if (patch.accountEmail !== undefined) map['dropbox:accountEmail'] = patch.accountEmail;
+    await chrome.storage.local.set(map);
+    return getDropboxAuth();
+  }
+
+  async function clearDropboxAuth() {
+    await chrome.storage.local.remove(DROPBOX_AUTH_KEYS);
+  }
+
+  /** Small status blob the popup/options status bar reads directly. */
+  async function getSyncStatus() {
+    const res = await chrome.storage.local.get(SYNC_STATUS_KEY);
+    return {
+      syncing: false,
+      lastSyncAt: 0,
+      lastSyncOk: null,
+      lastSyncError: '',
+      ...(res[SYNC_STATUS_KEY] || {}),
+    };
+  }
+
+  async function setSyncStatus(patch) {
+    const cur = await getSyncStatus();
+    const next = { ...cur, ...patch };
+    await chrome.storage.local.set({ [SYNC_STATUS_KEY]: next });
+    return next;
+  }
+
   return {
     HIST_PREFIX,
     WL_PREFIX,
     SUB_AUTH_KEYS,
+    DROPBOX_AUTH_KEYS,
+    SYNC_STATUS_KEY,
     DEFAULT_SETTINGS,
     idFor,
     getSettings,
     setSettings,
     upsertHistory,
+    putHistoryRaw,
     getHistoryFor,
     removeHistory,
     listHistory,
     clearHistory,
     addWatchlist,
+    putWatchlistRaw,
     removeWatchlist,
     listWatchlist,
     isInWatchlist,
     getWatchlistFor,
     getSubtitleAuth,
     setSubtitleAuth,
+    getDropboxAuth,
+    setDropboxAuth,
+    clearDropboxAuth,
+    getSyncStatus,
+    setSyncStatus,
   };
 
 })();

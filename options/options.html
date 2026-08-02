@@ -86,6 +86,52 @@
     </div>
   </section>
 
+  <section class="options-card">
+    <h2>Dropbox sync</h2>
+    <p class="muted">
+      Backs up Continue Watching, Watchlist, and settings to a single file
+      in your Dropbox's app folder, and merges them back in (newest wins)
+      on every device running this extension.
+    </p>
+    <ol class="muted setup-steps">
+      <li>Create a free app at
+        <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noreferrer">dropbox.com/developers/apps</a>
+        with <b>Scoped access</b> and the <b>App folder</b> access type.</li>
+      <li>Under <b>Permissions</b>, enable <code>files.content.write</code> and
+        <code>files.content.read</code>, then click <b>Submit</b>.</li>
+      <li>Under <b>OAuth 2</b> → <b>Redirect URIs</b>, add the URI shown below, then paste the app's
+        <b>App key</b> here and click Connect.</li>
+    </ol>
+    <div class="settings-list">
+      <div class="setting-row column">
+        <label>Redirect URI to register in your Dropbox app</label>
+        <div class="tag-input-row">
+          <input type="text" id="dropbox-redirect-uri" readonly />
+          <button type="button" id="dropbox-copy-redirect-btn" class="btn btn-secondary btn-sm">Copy</button>
+        </div>
+      </div>
+      <div class="setting-row column">
+        <label for="dropbox-appkey-input">Dropbox App key</label>
+        <input type="text" id="dropbox-appkey-input" placeholder="Paste App key…" autocomplete="off" spellcheck="false" />
+        <div class="tag-input-row">
+          <button type="button" id="dropbox-connect-btn" class="btn btn-primary btn-sm">Connect to Dropbox</button>
+          <button type="button" id="dropbox-disconnect-btn" class="btn btn-ghost btn-sm">Disconnect</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <label class="switch-label" for="dropbox-autosync-toggle">Auto-sync on every Nepu page open</label>
+        <label class="switch">
+          <input type="checkbox" id="dropbox-autosync-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="tag-input-row">
+        <button type="button" id="dropbox-sync-now-btn" class="btn btn-secondary btn-sm">Sync now</button>
+      </div>
+      <div id="dropbox-status" class="muted"></div>
+    </div>
+  </section>
+
   <section class="options-card danger-zone">
     <h2>Danger zone</h2>
     <p class="muted">These actions cannot be undone.</p>
