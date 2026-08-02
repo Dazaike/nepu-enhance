@@ -121,7 +121,7 @@ html.nvt-modern-ui,
 .nvt-modern-ui .list-movie:hover {
   transform: translateY(-4px) scale(1.02) !important;
   border-color: var(--nvt-border-hover) !important;
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.55) !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5) !important;
   z-index: 20 !important;
 }
 
@@ -131,9 +131,11 @@ html.nvt-modern-ui,
    as `auto` too, which clips the hover lift + box-shadow of each card at
    the row's own edges (painted pixels outside the box get cut even
    though they don't affect scrollHeight). Padding expands the clipping
-   box itself, giving hovered cards room to breathe. */
+   box itself, giving hovered cards room to breathe - sized generously
+   above what the hover shadow's own reach (offset + blur, ~26px) needs,
+   plus room for the -4px lift on the top side. */
 .nvt-modern-ui .row.list-scrollable {
-  padding: 14px 2px 26px !important;
+  padding: 20px 4px 40px !important;
 }
 
 .nvt-modern-ui .list-media {
