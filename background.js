@@ -321,14 +321,29 @@ chrome.notifications.onClicked.addListener(async (notifId) => {
   }
 });
 
+/** chrome.alarms.create({ periodInMinutes }) schedules its FIRST fire a
+ * full period from now, not immediately - without this, a fresh install
+ * (or first time the feature is enabled) would show an empty rail for up
+ * to a full day before the alarm ever runs once. */
+async function maybeInitialRecommendationsFetch() {
+  try {
+    const rec = await NVT.getRecommendations();
+    if (!rec.updatedAt) fetchRecommendations(false);
+  } catch (err) {
+    console.warn('[Nepu background] initial recommendations fetch check failed:', err);
+  }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   setupReleaseAlarm();
   setupRecommendationsAlarm();
+  maybeInitialRecommendationsFetch();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   setupReleaseAlarm();
   setupRecommendationsAlarm();
+  maybeInitialRecommendationsFetch();
 });
 
 // ---------------------------------------------------------------------------
