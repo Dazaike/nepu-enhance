@@ -1,175 +1,195 @@
 # Nepu Watch Tracker & Subtitles
 
-A Chrome (Manifest V3) extension for [Nepu](https://nepu.to/) and its mirrors
-(`nepu.is`, `nepu.net`) that adds:
+Chrome **Manifest V3** extension for [Nepu](https://nepu.to/) and its mirrors
+(`nepu.is`, `nepu.net`).
 
-- **Continue Watching** — tracks playback progress on any `<video>` you
-  watch and lets you resume exactly where you left off, including inside
-  same-origin embedded players.
-- **Watchlist** — bookmark shows/movies from the page itself or from the
-  popup; TV bookmarks automatically track whatever episode you're currently
-  on.
-- **On-page rails** — a "Continue Watching" / "Watchlist" row injected
-  directly into the Nepu homepage, above the site's own "Latest ..." rows.
-- **Subtitles** — search, download, and style OpenSubtitles captions
-  (with optional TMDB-assisted matching) from a dedicated popup tab,
-  including an auto-apply mode that loads the first match automatically.
-- **Dropbox sync** — backs up Continue Watching, Watchlist, and settings
-  to your own Dropbox app folder and merges them back in (newest wins),
-  automatically each time you open a Nepu page, or on demand.
-- **New release tracking** — monitors TMDB for new TV episode air dates
-  for your Watchlist shows and sends desktop notifications when new episodes air.
-- **Recommended For You** — a TMDB-powered recommendations rail on the
-  homepage, seeded from your Watchlist/Continue Watching, since Nepu's own
-  recommendations are weak.
-- **Modern Netflix UI overhaul** — transforms Nepu (`nepu.to`, `nepu.is`, `nepu.net`)
-  with a sleek dark glassmorphism header, smooth poster card hover effects, cinema player styling,
-  and auto-cleared ad placeholders.
+**Current version: 5.7.8**
+
+## Highlights
+
+- **Continue Watching** — track `<video>` progress and resume where you left off
+- **Watchlist** — bookmark titles from the page or popup; TV entries follow the episode you’re on
+- **Homepage rails** — Continue Watching + Watchlist injected above Nepu’s own rows
+- **Discovery rails** — multi-row TMDB catalog (personalized + Now Playing, Trending, genres, anime)
+- **Subtitles** — OpenSubtitles search/download/style, optional TMDB matching, auto-apply
+- **Dropbox sync** — backup/merge CW, Watchlist, and settings (API keys stay local)
+- **New episode alerts** — TMDB air-date checks + desktop notifications + **clear NEW** control
+- **Modern UI** — dark theme, raised poster hover, smaller hero, pinned search + floating results
+
 ## Install (unpacked)
 
-1. Clone or download this repository.
+1. Clone or download this repository (or grab a [release](https://github.com/Dazaike/nepu-watch-tracker/releases)).
 2. Open `chrome://extensions`, enable **Developer mode**.
 3. Click **Load unpacked** and select the repository folder.
-4. Visit `nepu.to`, `nepu.is`, or `nepu.net` and start watching.
+4. Visit `nepu.to`, `nepu.is`, or `nepu.net`.
+5. (Optional) Open **Options** and add free OpenSubtitles / TMDB keys for subtitles, release tracking, and discovery rails.
 
 ## Features in detail
 
 ### Continue Watching
-Any `<video>` element longer than the configured minimum length is tracked.
-Progress saves immediately on pause, on the video ending, when the tab is
-hidden, and periodically (every 5 seconds) while playing. Reopen the popup
-or revisit the page and playback resumes automatically — episode-aware, so
-starting the next episode of a show updates the same bookmark instead of
-creating a duplicate.
+
+Any `<video>` longer than the configured minimum length is tracked. Progress
+saves on pause, end, tab hide, and every few seconds while playing. Reopen the
+popup or revisit the page to resume — episode-aware, so the next episode of a
+show updates the same entry instead of duplicating it.
+
+On the homepage **Continue Watching** rail, hover a poster and click **×** to
+remove that entry (same as remove in the popup).
 
 ### Watchlist
-Click the bookmark icon injected next to a title's own action buttons (or
-use "+ Add tab" in the popup) to save it. TV show bookmarks silently track
-forward to whichever episode you're currently on; movies stay as a single
-entry.
+
+Use the on-page bookmark control or **+ Add tab** in the popup. TV bookmarks
+advance to the episode you’re watching; movies stay as a single entry.
+
+### Homepage rails
+
+Injected above Nepu’s first “Latest …” section on the homepage only:
+
+1. **Continue Watching** (local history) — open title, or **×** to remove  
+2. **Watchlist** (local list) — open title; click green **NEW** to mark caught up  
+3. **Discovery rails** (TMDB cache, optional) — multi-row browse  
+
+### Discovery rails (TMDB)
+
+Multi-row discovery (toggle on the options page), for example:
+
+- Personalized **Because you watched …** (when a seed is available)
+- **Now Playing**, **Trending Movies**, **Trending TV**, **Popular TV Shows**
+- **Anime Spotlight** and genre rows (Action, Comedy, Scary, Korean, Romance)
+
+Cards try to **open the best Nepu catalog match** (search/ajax resolve + short
+local cache). If no match is found, they fall back to Nepu search.
+
+Refreshed on a timer (6–48 hours) or via **Refresh discovery rails now** on the
+options page. Requires a free [TMDB API key](https://www.themoviedb.org/settings/api).
 
 ### Subtitles
-Search OpenSubtitles by title, IMDb ID, TMDB ID, or season/episode; narrow
-results with a TMDB lookup when a plain title search is ambiguous. Caption
-style (position, size, color, font, background, timing offset) is
-adjustable live from the **Style** tab. An **auto-apply** setting searches
-and loads the first match automatically when nothing is loaded yet.
 
-Requires a free [OpenSubtitles API key](https://www.opensubtitles.com/consumers)
-and, optionally, a [TMDB API key](https://www.themoviedb.org/settings/api)
-for more reliable TV episode matching — both are entered on the extension's
-options page (right-click the extension icon → **Options**), and are shared
-across all three Nepu mirrors.
+Search OpenSubtitles by title, IMDb/TMDB ID, or season/episode; optional TMDB
+lookup when the title is ambiguous. Live style controls (position, size, color,
+font, background, timing). **Auto-apply** can load the first match when nothing
+is loaded yet.
+
+Needs a free [OpenSubtitles API key](https://www.opensubtitles.com/consumers)
+(and optionally TMDB). Keys are set on the options page and never synced to
+Dropbox.
 
 ### Dropbox sync
-Keeps Continue Watching, Watchlist, and settings backed up and merged
-across every browser/device running this extension, via a single JSON
-file in your Dropbox app folder.
 
-1. On the **options page**, create a free Dropbox app at
+Backs up Continue Watching, Watchlist, and settings to a JSON file in your
+Dropbox **app folder** (newest wins on merge).
+
+1. Create a free Dropbox app at
    [dropbox.com/developers/apps](https://www.dropbox.com/developers/apps)
-   (scoped access, App folder permission, with
-   `files.content.write`/`files.content.read` enabled).
-2. Register the redirect URI shown on the options page under the app's
-   OAuth 2 settings.
-3. Paste the app's **App key** into the options page and click
-   **Connect to Dropbox**.
+   (scoped access, App folder, `files.content.read` / `files.content.write`).
+2. Register the redirect URI shown on the options page.
+3. Paste the **App key** and click **Connect to Dropbox**.
 
-Once connected, sync runs automatically whenever you open a Nepu page
-(throttled to at most once every 5 minutes), or on demand via **Sync now**
-in the popup's Settings tab — which also has an **Auto-sync with Dropbox**
-toggle and a status line showing the last sync result. Auto-apply and API
-keys stay local; syncing never uploads your OpenSubtitles/TMDB keys.
+Sync runs when you open a Nepu page (throttled) or via **Sync now** in the
+popup. Auto-apply and API keys stay local.
 
-### New release tracking & Notifications
-Monitors TMDB air dates for TV shows in your Watchlist and alerts you via
-desktop notifications when a new episode airs.
+### New release tracking & notifications
 
-- **Automatic background checks:** Runs periodically via `chrome.alarms`
-  (configurable to 6, 12, or 24 hours).
-- **Visual badges:** Cards with un-watched released episodes show a prominent
-  `NEW S3 E9` badge in the popup and on the homepage Watchlist rail.
-- **Clear NEW / mark caught up:** In the popup, click the green **✓** (list
-  view) or the **NEW** badge itself (grid view). On the homepage Watchlist
-  rail, click the green NEW badge. That sets progress to the latest known
-  episode and drops `hasNewRelease`.
-- **Per-show opt-out:** Enable/disable release tracking for specific shows
-  on the options page.
-- **Test notification button:** Click **Send test notification** on the options
-  page to verify OS notifications work anytime.
+Background TMDB checks for Watchlist TV shows:
 
-### Recommended For You
-Nepu's own catalog is complete but weak at recommending things. This uses
-the TMDB API (the same free key already configured for subtitle matching
-above) to build a real recommendations rail on the homepage.
+- Configurable interval (6 / 12 / 24 hours)
+- Green **NEW Sx Ey** badge in the popup and on the homepage Watchlist rail
+- Desktop notifications when a new episode first appears
+- **Clear NEW / mark caught up:**
+  - Popup list view → green **✓**
+  - Popup grid view → click the **NEW** badge
+  - Homepage rail → click the **NEW** badge  
+  Sets progress to the latest known episode and clears `hasNewRelease`
+- Per-show opt-out on the options page
+- **Send test notification** on the options page
 
-- **Seeded from your activity:** Looks at your most recently added
-  Watchlist item (or most recent Continue Watching entry if the Watchlist
-  is empty), resolves it on TMDB, and pulls its recommendations graph.
-- **Falls back to Trending:** If there's nothing to seed from yet, shows
-  TMDB's weekly trending movies/shows instead.
-- **Click to search:** Recommendation cards have no direct Nepu URL (TMDB
-  IDs don't map to Nepu's own catalog IDs), so clicking one submits Nepu's
-  own search box for that title.
-- **Background refresh:** Runs periodically via `chrome.alarms`
-  (configurable to 6, 12, 24, or 48 hours), or on demand via **Refresh
-  recommendations now** on the options page.
+### Modern UI overhaul
 
-Available from the popup's **Settings** tab and the full options page:
+Optional theme class on Nepu pages:
+
+- Dark glass header, full-width layout, blue accent retint
+- Poster cards: raised hover, soft darken (not the site’s heavy black wash)
+- Full HD quality tags hidden on posters; star rating pinned inside the card
+- Smaller hero carousel
+- Search bar pinned top-left; typeahead results floated above the hero so they
+  aren’t clipped
+- Ad placeholder cleanup
+
+Toggle: **Modern Netflix UI on Nepu** (options / popup settings).
+
+## Settings (summary)
 
 | Setting | Effect |
 |---|---|
-| Track video playback | Master on/off switch for Continue Watching |
-| Auto-resume playback position | Seek to your last position on load |
-| Auto-apply captions on Nepu | Auto-search + load subtitles when none are loaded yet |
-| Show time instead of percentage | Display `12:34 / 45:00` instead of `28%` |
-| Minimum video length to track | Ignore short clips/previews below this length |
-| Mark watched at % | Progress threshold at which a video drops out of Continue Watching |
-| Auto-sync with Dropbox | Sync automatically on every Nepu page open (see **Sync now** for a manual trigger) |
-| Track new episode releases | Background checks via TMDB for new TV episode air dates |
-| Desktop notifications | Send OS desktop notifications when new episodes air |
-| Show "Recommended For You" rail | Toggle the TMDB-powered recommendations rail on the homepage |
-| Modern Netflix UI on Nepu | Revamps Nepu with a dark glassmorphism layout, cinema player, and clean poster grids |
+| Track video playback | Master on/off for Continue Watching |
+| Auto-resume playback position | Seek to last position on load |
+| Auto-apply captions on Nepu | Auto-search + load when none loaded |
+| Show time instead of percentage | `12:34 / 45:00` vs `28%` |
+| Minimum video length to track | Ignore short clips |
+| Mark watched at % | Drop from CW when progress is high enough |
+| Auto-sync with Dropbox | Sync on Nepu page open |
+| Track new episode releases | TMDB background checks |
+| Desktop notifications | OS alerts for new episodes |
+| Show discovery rails on homepage | Multi-row TMDB rails |
+| Modern Netflix UI on Nepu | Theme overhaul |
+
 ## Permissions
 
-- `storage` — all watch history, watchlist entries, and settings are kept
-  in `chrome.storage.local` (never leaves the browser).
-- `scripting`, `activeTab`, `tabs` — used by the popup's "+ Add current tab"
-  watchlist button and "Exclude this site" settings shortcut.
-- Host permissions for `opensubtitles.com` and `themoviedb.org` — the
-  background service worker relays subtitle search/download requests, TMDB
-  release-tracking checks, and "Recommended For You" refreshes to these
-  APIs, since content scripts don't get an automatic CORS bypass.
-- `identity`, and host permissions for `dropboxapi.com` — used only if you
-  connect Dropbox sync on the options page; the OAuth flow and file
-  upload/download run through this permission.
-- `notifications`, `alarms` — used for desktop alerts and periodic background
-  checks when new TV episodes air.
+- `storage` — history, watchlist, settings (local only by default)
+- `scripting`, `activeTab`, `tabs` — add current tab / site helpers
+- Hosts for OpenSubtitles + TMDB — subtitle + discovery + release checks
+- `identity` + Dropbox hosts — only if you connect Dropbox
+- `notifications`, `alarms` — release alerts and periodic refreshes
+
 ## Project layout
 
 ```
 manifest.json
-background.js          Service worker: OpenSubtitles/TMDB network relay, release tracking, recommendations engine
+background.js           Service worker: API relay, release checks, discovery cache
 common/
-  store.js             Shared chrome.storage.local schema (history, watchlist, settings)
-  nepu-title.js         Nepu URL/title parsing shared by the tracker and subtitle search
+  store.js              chrome.storage.local schema + helpers
+  nepu-title.js         Nepu URL/title parsing
 content/
-  tracker.js            Continue Watching tracking + auto-resume
-  subtitles.js           Subtitle search/download/style engine + on-page bookmark button
-  home-rails.js           Continue Watching/Watchlist/Recommended rails on the Nepu homepage
-  theme.js              Modern Netflix UI theme class toggler
-  theme.css             Modern Netflix UI glassmorphism stylesheet
-popup/                  Extension popup UI (Continue Watching, Watchlist, Subtitles, Settings)
-options/                Full-page settings + OpenSubtitles/TMDB API keys
+  tracker.js            Continue Watching + auto-resume
+  subtitles.js          Captions + on-page bookmark
+  home-rails.js         Homepage CW / Watchlist / discovery rails
+  theme.js              Theme class + search bar / typeahead chrome
+  theme.css             Modern UI stylesheet
+popup/                  Continue Watching, Watchlist, Subtitles, Settings
+options/                Full settings + API keys + Dropbox
 icons/
 ```
 
-## Notes
+## Releases
 
-- All data stays local to your browser by default; nothing is sent
-  anywhere except the OpenSubtitles/TMDB API calls you trigger yourself,
-  and — only if you explicitly connect it — your own Dropbox app folder.
-- If a Nepu page embeds its player in a cross-origin iframe, captions
-  cannot be injected into that frame (a browser security limitation, not
-  something this extension can work around).
+See [GitHub Releases](https://github.com/Dazaike/nepu-watch-tracker/releases)
+for tagged versions and downloadable source archives.
 
+### Changelog (recent)
+
+#### 5.7.8
+
+- Homepage Continue Watching rail: **×** remove button (hover on poster)
+
+#### 5.7.7
+
+- Multi-rail TMDB discovery (personalized + Now Playing / Trending / genres / anime)
+- Smart open for discovery cards (resolve Nepu URL, cache, search fallback)
+- Clear NEW / mark caught up (popup + Watchlist rail)
+- Card hover raise + custom darken; hide Full HD; pin rating badge
+- Smaller hero; pinned search bar; floating typeahead over carousel
+
+#### 5.7.0–5.7.5
+
+- Recommended For You engine and hover-shadow / rail layout fixes
+
+#### 5.6.x
+
+- Hero carousel styling; player experiments reverted
+
+## Privacy notes
+
+- Data stays in the browser unless you use OpenSubtitles/TMDB (calls you
+  trigger or background jobs you enable) or connect Dropbox.
+- OpenSubtitles / TMDB keys are **not** uploaded to Dropbox.
+- Cross-origin player iframes cannot receive injected captions (browser limit).
