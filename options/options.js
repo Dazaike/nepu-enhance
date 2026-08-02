@@ -14,7 +14,6 @@
   const autoApplyToggle = document.getElementById('autoapply-toggle');
   const useTimeToggle = document.getElementById('usetime-toggle');
   const modernUiToggle = document.getElementById('modernui-toggle');
-  const vidstackToggle = document.getElementById('vidstack-toggle');
   const dropboxAutoSyncToggle = document.getElementById('dropbox-autosync-toggle');
   const relTrackToggle = document.getElementById('rel-track-toggle');
   const relNotifToggle = document.getElementById('rel-notif-toggle');
@@ -34,7 +33,6 @@
     autoApplyToggle.checked = !!settings.autoApplyCaptions;
     useTimeToggle.checked = !!settings.useTimeProgress;
     modernUiToggle.checked = settings.nepuModernUi !== false;
-    vidstackToggle.checked = settings.vidstackPlayerEnabled === true;
     dropboxAutoSyncToggle.checked = settings.dropboxAutoSync !== false;
     relTrackToggle.checked = !!settings.releaseTrackingEnabled;
     relNotifToggle.checked = !!settings.desktopNotificationsEnabled;
@@ -57,9 +55,6 @@
     });
     modernUiToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ nepuModernUi: modernUiToggle.checked });
-    });
-    vidstackToggle.addEventListener('change', async () => {
-      state.settings = await NVT.setSettings({ vidstackPlayerEnabled: vidstackToggle.checked });
     });
     dropboxAutoSyncToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ dropboxAutoSync: dropboxAutoSyncToggle.checked });
@@ -414,36 +409,6 @@
       await refreshReleaseStatusUI();
     }
   });
-
-  // -------------------------------------------------------------------
-  // Vidstack experimental player - debug log viewer
-  // -------------------------------------------------------------------
-  const vidstackDebugLogEl = document.getElementById('vidstack-debug-log');
-  const vidstackDebugCountEl = document.getElementById('vidstack-debug-count');
-  const vidstackDebugRefreshBtn = document.getElementById('vidstack-debug-refresh-btn');
-  const vidstackDebugClearBtn = document.getElementById('vidstack-debug-clear-btn');
-
-  async function renderVidstackDebugLog() {
-    const log = await NVT.getDebugLog();
-    vidstackDebugCountEl.textContent = log.length ? `(${log.length} entries)` : '(empty - nothing logged yet)';
-    vidstackDebugLogEl.value = log
-      .map((e) => `${new Date(e.t).toLocaleTimeString()} [${e.tag}] ${e.message}`)
-      .join('\n');
-    vidstackDebugLogEl.scrollTop = vidstackDebugLogEl.scrollHeight;
-  }
-
-  vidstackDebugRefreshBtn.addEventListener('click', renderVidstackDebugLog);
-  vidstackDebugClearBtn.addEventListener('click', async () => {
-    await NVT.clearDebugLog();
-    await renderVidstackDebugLog();
-  });
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.nvtDebugLog) renderVidstackDebugLog();
-  });
-  renderVidstackDebugLog().catch((err) => {
-    console.error('[Nepu Watch Tracker] vidstack debug log init failed:', err);
-  });
-
   refreshReleaseStatusUI().catch((err) => {
     console.error('[Nepu Watch Tracker] release status init failed:', err);
   });
