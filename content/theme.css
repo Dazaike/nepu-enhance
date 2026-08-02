@@ -108,34 +108,46 @@ html.nvt-modern-ui,
   box-shadow: 0 0 10px var(--nvt-accent-glow) !important;
 }
 
-/* 4. Movie & TV Show Card Grids (.list-movie, .list-media, .media-cover) */
+/* 4. Movie & TV Show Card Grids (.list-movie, .list-media, .media-cover)
+
+   Clip the poster only (.list-media / .media), never the whole card.
+   overflow:hidden on .list-movie was clipping our own hover box-shadow
+   (shadows paint outside the border box and get cut by overflow != visible).
+   Scaling .media inside nepu's overflow:hidden .media also just zoom-cropped
+   the poster into its own corners - drop that inner scale; lift the card. */
 .nvt-modern-ui .list-movie {
   border-radius: 10px !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   background: var(--nvt-bg-elevated) !important;
   border: 1px solid var(--nvt-border) !important;
   padding: 0 !important;
+  position: relative !important;
   transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.22s ease !important;
 }
 
 .nvt-modern-ui .list-movie:hover {
-  transform: translateY(-4px) scale(1.02) !important;
+  transform: translateY(-6px) !important;
   border-color: var(--nvt-border-hover) !important;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5) !important;
-  z-index: 20 !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55) !important;
+  z-index: 30 !important;
 }
 
-/* nepu's own CSS sets `.list-scrollable { overflow-x: auto }` with no
-   explicit overflow-y. Per spec, when one axis isn't `visible` the other
-   can't stay `visible` either - the browser silently computes overflow-y
-   as `auto` too, which clips the hover lift + box-shadow of each card at
-   the row's own edges (painted pixels outside the box get cut even
-   though they don't affect scrollHeight). Padding expands the clipping
-   box itself, giving hovered cards room to breathe - sized generously
-   above what the hover shadow's own reach (offset + blur, ~26px) needs,
-   plus room for the -4px lift on the top side. */
+/* Horizontal rails: overflow-x:auto forces overflow-y to non-visible, which
+   would still clip the card lift/shadow. Pad the scrollport so the painted
+   shadow has room inside the clipping box. Also force overflow-y: visible
+   where the engine allows it (some UAs still pair the axes). */
 .nvt-modern-ui .row.list-scrollable {
-  padding: 20px 4px 40px !important;
+  padding: 20px 8px 48px !important;
+  margin-top: -12px !important;
+  margin-bottom: -12px !important;
+  overflow-x: auto !important;
+  /* paired-axis caveat: visible is ignored next to overflow-x:auto and
+     becomes auto - padding above is what actually reserves shadow room */
+  overflow-y: visible !important;
+}
+
+.nvt-modern-ui .row > [class*="col"] {
+  overflow: visible !important;
 }
 
 .nvt-modern-ui .list-media {
@@ -148,12 +160,7 @@ html.nvt-modern-ui,
 .nvt-modern-ui .media.media-cover,
 .nvt-modern-ui .media.media-episode {
   border-radius: 8px !important;
-  transition: transform 0.25s ease !important;
-}
-
-.nvt-modern-ui .list-movie:hover .media.media-cover,
-.nvt-modern-ui .list-movie:hover .media.media-episode {
-  transform: scale(1.04) !important;
+  /* no transform on hover - .media is overflow:hidden from nepu */
 }
 
 /* Quality Tag & IMDb Score Overlay Badges */

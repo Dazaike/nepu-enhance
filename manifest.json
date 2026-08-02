@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Nepu Watch Tracker & Subtitles",
-  "version": "5.7.2",
+  "version": "5.7.3",
   "description": "Continue Watching, a Watchlist, and OpenSubtitles captions for Nepu (nepu.to / nepu.is / nepu.net).",
   "permissions": ["storage", "scripting", "activeTab", "tabs", "identity", "notifications", "alarms"],
   "host_permissions": [
