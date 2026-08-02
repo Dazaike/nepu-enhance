@@ -180,6 +180,37 @@
     </div>
   </section>
 
+  <section class="options-card">
+    <h2>Recommended For You</h2>
+    <p class="muted">
+      Nepu's own catalog is complete but its recommendations are weak — this uses TMDB (the same free API key
+      configured above for OpenSubtitles matching) to suggest movies/shows based on your Watchlist and
+      Continue Watching, injected as a rail on the homepage. Clicking a recommendation searches for it on Nepu.
+    </p>
+    <div class="settings-list">
+      <div class="setting-row">
+        <label class="switch-label" for="rec-enabled-toggle">Show "Recommended For You" rail</label>
+        <label class="switch">
+          <input type="checkbox" id="rec-enabled-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <div class="setting-row column">
+        <label for="rec-interval-select">Refresh frequency</label>
+        <select id="rec-interval-select">
+          <option value="6">Every 6 hours</option>
+          <option value="12">Every 12 hours</option>
+          <option value="24">Every 24 hours</option>
+          <option value="48">Every 2 days</option>
+        </select>
+      </div>
+      <div class="tag-input-row">
+        <button type="button" id="rec-refresh-now-btn" class="btn btn-primary btn-sm">Refresh recommendations now</button>
+      </div>
+      <div id="rec-status" class="muted"></div>
+    </div>
+  </section>
+
   <section class="options-card danger-zone">
     <h2>Danger zone</h2>
     <p class="muted">These actions cannot be undone.</p>

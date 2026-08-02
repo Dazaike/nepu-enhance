@@ -11,6 +11,8 @@ importScripts('common/store.js');
  * SEND_TEST_NOTIFICATION: fires a test desktop notification.
  *
  * CHECK_RELEASES_NOW: triggers immediate TMDB new episode check for watchlist items.
+ *
+ * REFRESH_RECOMMENDATIONS_NOW: triggers immediate TMDB "Recommended For You" refresh.
  */
 
 const DROPBOX_SYNC_PATH = '/nepu-watch-tracker-sync.json';
@@ -302,6 +304,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm && alarm.name === 'checkNewReleases') {
     checkNewReleases(false);
   }
+  if (alarm && alarm.name === 'refreshRecommendations') {
+    fetchRecommendations(false);
+  }
 });
 
 chrome.notifications.onClicked.addListener(async (notifId) => {
@@ -318,14 +323,142 @@ chrome.notifications.onClicked.addListener(async (notifId) => {
 
 chrome.runtime.onInstalled.addListener(() => {
   setupReleaseAlarm();
+  setupRecommendationsAlarm();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   setupReleaseAlarm();
+  setupRecommendationsAlarm();
 });
 
 // ---------------------------------------------------------------------------
-// 3. Message Routing
+// 3. Recommendations Engine ("Recommended For You" homepage rail)
+// ---------------------------------------------------------------------------
+// nepu's own catalog is fine but its recommendations are weak. TMDB (the
+// same API already used for release tracking and subtitle matching above)
+// has a real recommendations graph. This mirrors the release-tracking
+// pattern exactly: background.js refreshes a cache on an alarm, and
+// content/home-rails.js just does a fast local read of that cache to
+// render the rail — no network calls at page-render time.
+//
+// Recommendation cards have no direct nepu.is URL (TMDB IDs don't map to
+// nepu's internal catalog IDs), so home-rails.js instead submits nepu's
+// own live search form for the title when a card is clicked.
+
+function cleanTitleForTmdbSearch(title) {
+  return String(title || '')
+    .replace(/\b[Ss]\d+\s*[Ee]\d+\b/g, '')
+    .replace(/\((?:19|20)\d{2}\)/g, '')
+    .replace(/\b(19|20)\d{2}\b/g, '')
+    .trim();
+}
+
+async function resolveTmdbSeed(item, apiKey) {
+  const mediaType = item.mediaType === 'tv' ? 'tv' : 'movie';
+  if (item.tmdbId) return { id: item.tmdbId, mediaType };
+  const query = cleanTitleForTmdbSearch(item.title);
+  if (!query) return null;
+  const data = await tmdbFetch(`/search/${mediaType}`, { query }, apiKey);
+  const first = data && data.results && data.results[0];
+  return first ? { id: first.id, mediaType } : null;
+}
+
+function mapTmdbRecommendation(raw, fallbackMediaType) {
+  if (!raw || !raw.poster_path) return null;
+  const mediaType = raw.media_type || fallbackMediaType;
+  return {
+    id: `${mediaType}-${raw.id}`,
+    title: raw.title || raw.name || 'Untitled',
+    poster: `https://image.tmdb.org/t/p/w342${raw.poster_path}`,
+    mediaType,
+    rating: typeof raw.vote_average === 'number' ? Math.round(raw.vote_average * 10) / 10 : null,
+  };
+}
+
+async function fetchRecommendations(force) {
+  try {
+    const settings = await NVT.getSettings();
+    if (!force && !settings.recommendationsEnabled) {
+      return { ok: true, skipped: true };
+    }
+
+    const subAuth = await NVT.getSubtitleAuth();
+    const apiKey = subAuth.tmdbApiKey;
+    if (!apiKey) {
+      const msg = 'TMDB API key missing. Add a free TMDB key on the options page to enable recommendations.';
+      await NVT.setRecommendations({ checking: false, lastError: msg });
+      return { ok: false, error: msg };
+    }
+
+    await NVT.setRecommendations({ checking: true });
+
+    const [watchlist, history] = await Promise.all([NVT.listWatchlist(), NVT.listHistory()]);
+    const seedCandidates = [
+      ...watchlist.slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)),
+      ...history.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
+    ].filter((item) => item && item.title);
+
+    let items = [];
+    let reason = 'Trending Now';
+
+    for (const seed of seedCandidates) {
+      try {
+        const resolved = await resolveTmdbSeed(seed, apiKey);
+        if (!resolved) continue;
+        const recData = await tmdbFetch(`/${resolved.mediaType}/${resolved.id}/recommendations`, {}, apiKey);
+        const results = (recData && recData.results) || [];
+        const mapped = results.map((r) => mapTmdbRecommendation(r, resolved.mediaType)).filter(Boolean);
+        if (mapped.length) {
+          items = mapped.slice(0, 12);
+          reason = `Because you watched ${seed.title}`;
+          break;
+        }
+      } catch (seedErr) {
+        console.warn('[Nepu background] recommendation seed failed:', seed.title, seedErr);
+      }
+    }
+
+    if (!items.length) {
+      const trending = await tmdbFetch('/trending/all/week', {}, apiKey);
+      const results = (trending && trending.results) || [];
+      items = results
+        .filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
+        .map((r) => mapTmdbRecommendation(r, r.media_type))
+        .filter(Boolean)
+        .slice(0, 12);
+      reason = 'Trending Now';
+    }
+
+    await NVT.setRecommendations({
+      checking: false,
+      items,
+      reason,
+      updatedAt: Date.now(),
+      lastError: '',
+    });
+    return { ok: true, count: items.length };
+  } catch (err) {
+    const msg = String((err && err.message) || err);
+    await NVT.setRecommendations({ checking: false, lastError: msg });
+    return { ok: false, error: msg };
+  }
+}
+
+async function setupRecommendationsAlarm() {
+  try {
+    const settings = await NVT.getSettings();
+    await chrome.alarms.clear('refreshRecommendations');
+    if (settings.recommendationsEnabled) {
+      const hours = settings.recommendationsCheckIntervalHours || 24;
+      chrome.alarms.create('refreshRecommendations', { periodInMinutes: hours * 60 });
+    }
+  } catch (err) {
+    console.warn('[Nepu background] recommendations alarm setup failed:', err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4. Message Routing
 // ---------------------------------------------------------------------------
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -365,6 +498,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg && msg.type === 'UPDATE_RELEASE_ALARM') {
     setupReleaseAlarm().then(() => sendResponse({ ok: true }));
+    return true;
+  }
+
+  if (msg && msg.type === 'REFRESH_RECOMMENDATIONS_NOW') {
+    fetchRecommendations(true).then(sendResponse);
+    return true;
+  }
+
+  if (msg && msg.type === 'UPDATE_RECOMMENDATIONS_ALARM') {
+    setupRecommendationsAlarm().then(() => sendResponse({ ok: true }));
     return true;
   }
 

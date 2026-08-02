@@ -125,6 +125,17 @@ html.nvt-modern-ui,
   z-index: 20 !important;
 }
 
+/* nepu's own CSS sets `.list-scrollable { overflow-x: auto }` with no
+   explicit overflow-y. Per spec, when one axis isn't `visible` the other
+   can't stay `visible` either - the browser silently computes overflow-y
+   as `auto` too, which clips the hover lift + box-shadow of each card at
+   the row's own edges (painted pixels outside the box get cut even
+   though they don't affect scrollHeight). Padding expands the clipping
+   box itself, giving hovered cards room to breathe. */
+.nvt-modern-ui .row.list-scrollable {
+  padding: 14px 2px 26px !important;
+}
+
 .nvt-modern-ui .list-media {
   position: relative !important;
   border-radius: 8px !important;

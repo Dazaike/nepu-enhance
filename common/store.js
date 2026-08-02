@@ -25,6 +25,7 @@ const NVT = (() => {
   ];
   const SYNC_STATUS_KEY = 'dropboxSyncStatus';
   const RELEASE_STATUS_KEY = 'releaseCheckStatus';
+  const RECOMMENDATIONS_KEY = 'nvtRecommendations';
 
   const DEFAULT_SETTINGS = Object.freeze({
     trackingEnabled: true,
@@ -40,6 +41,8 @@ const NVT = (() => {
     releaseCheckIntervalHours: 12,
     releaseOptOutIds: [],
     nepuModernUi: true,
+    recommendationsEnabled: true,
+    recommendationsCheckIntervalHours: 24,
     updatedAt: 0,
   });
 
@@ -307,6 +310,28 @@ const NVT = (() => {
     await chrome.storage.local.set({ [RELEASE_STATUS_KEY]: next });
     return next;
   }
+
+  /** TMDB-powered "Recommended For You" cache — refreshed periodically by
+   * background.js (mirrors the release-tracking status pattern) so the
+   * homepage rail render stays a fast local read, never a network call. */
+  async function getRecommendations() {
+    const res = await chrome.storage.local.get(RECOMMENDATIONS_KEY);
+    return {
+      items: [],
+      updatedAt: 0,
+      reason: '',
+      checking: false,
+      lastError: '',
+      ...(res[RECOMMENDATIONS_KEY] || {}),
+    };
+  }
+
+  async function setRecommendations(patch) {
+    const cur = await getRecommendations();
+    const next = { ...cur, ...patch };
+    await chrome.storage.local.set({ [RECOMMENDATIONS_KEY]: next });
+    return next;
+  }
   return {
     HIST_PREFIX,
     WL_PREFIX,
@@ -314,6 +339,7 @@ const NVT = (() => {
     DROPBOX_AUTH_KEYS,
     SYNC_STATUS_KEY,
     RELEASE_STATUS_KEY,
+    RECOMMENDATIONS_KEY,
     DEFAULT_SETTINGS,
     idFor,
     getSettings,
@@ -340,6 +366,8 @@ const NVT = (() => {
     setSyncStatus,
     getReleaseStatus,
     setReleaseStatus,
+    getRecommendations,
+    setRecommendations,
   };
 
 })();

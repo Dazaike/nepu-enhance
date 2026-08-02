@@ -19,6 +19,9 @@ A Chrome (Manifest V3) extension for [Nepu](https://nepu.to/) and its mirrors
   automatically each time you open a Nepu page, or on demand.
 - **New release tracking** — monitors TMDB for new TV episode air dates
   for your Watchlist shows and sends desktop notifications when new episodes air.
+- **Recommended For You** — a TMDB-powered recommendations rail on the
+  homepage, seeded from your Watchlist/Continue Watching, since Nepu's own
+  recommendations are weak.
 - **Modern Netflix UI overhaul** — transforms Nepu (`nepu.to`, `nepu.is`, `nepu.net`)
   with a sleek dark glassmorphism header, smooth poster card hover effects, cinema player styling,
   and auto-cleared ad placeholders.
@@ -89,10 +92,24 @@ desktop notifications when a new episode airs.
 - **Per-show opt-out:** Enable/disable release tracking for specific shows
   on the options page.
 - **Test notification button:** Click **Send test notification** on the options
-| Auto-sync with Dropbox | Sync automatically on every Nepu page open (see **Sync now** for a manual trigger) |
-| Track new episode releases | Background checks via TMDB for new TV episode air dates |
-| Desktop notifications | Send OS desktop notifications when new episodes air |
-| Modern Netflix UI on Nepu | Revamps Nepu with a dark glassmorphism layout, cinema player, and clean poster grids |
+  page to verify OS notifications work anytime.
+
+### Recommended For You
+Nepu's own catalog is complete but weak at recommending things. This uses
+the TMDB API (the same free key already configured for subtitle matching
+above) to build a real recommendations rail on the homepage.
+
+- **Seeded from your activity:** Looks at your most recently added
+  Watchlist item (or most recent Continue Watching entry if the Watchlist
+  is empty), resolves it on TMDB, and pulls its recommendations graph.
+- **Falls back to Trending:** If there's nothing to seed from yet, shows
+  TMDB's weekly trending movies/shows instead.
+- **Click to search:** Recommendation cards have no direct Nepu URL (TMDB
+  IDs don't map to Nepu's own catalog IDs), so clicking one submits Nepu's
+  own search box for that title.
+- **Background refresh:** Runs periodically via `chrome.alarms`
+  (configurable to 6, 12, 24, or 48 hours), or on demand via **Refresh
+  recommendations now** on the options page.
 
 Available from the popup's **Settings** tab and the full options page:
 
@@ -107,6 +124,8 @@ Available from the popup's **Settings** tab and the full options page:
 | Auto-sync with Dropbox | Sync automatically on every Nepu page open (see **Sync now** for a manual trigger) |
 | Track new episode releases | Background checks via TMDB for new TV episode air dates |
 | Desktop notifications | Send OS desktop notifications when new episodes air |
+| Show "Recommended For You" rail | Toggle the TMDB-powered recommendations rail on the homepage |
+| Modern Netflix UI on Nepu | Revamps Nepu with a dark glassmorphism layout, cinema player, and clean poster grids |
 ## Permissions
 
 - `storage` — all watch history, watchlist entries, and settings are kept
@@ -114,8 +133,9 @@ Available from the popup's **Settings** tab and the full options page:
 - `scripting`, `activeTab`, `tabs` — used by the popup's "+ Add current tab"
   watchlist button and "Exclude this site" settings shortcut.
 - Host permissions for `opensubtitles.com` and `themoviedb.org` — the
-  background service worker relays subtitle search/download requests to
-  these APIs, since content scripts don't get an automatic CORS bypass.
+  background service worker relays subtitle search/download requests, TMDB
+  release-tracking checks, and "Recommended For You" refreshes to these
+  APIs, since content scripts don't get an automatic CORS bypass.
 - `identity`, and host permissions for `dropboxapi.com` — used only if you
   connect Dropbox sync on the options page; the OAuth flow and file
   upload/download run through this permission.
@@ -125,14 +145,14 @@ Available from the popup's **Settings** tab and the full options page:
 
 ```
 manifest.json
-background.js          Service worker: OpenSubtitles/TMDB network relay
+background.js          Service worker: OpenSubtitles/TMDB network relay, release tracking, recommendations engine
 common/
   store.js             Shared chrome.storage.local schema (history, watchlist, settings)
   nepu-title.js         Nepu URL/title parsing shared by the tracker and subtitle search
 content/
   tracker.js            Continue Watching tracking + auto-resume
   subtitles.js           Subtitle search/download/style engine + on-page bookmark button
-  home-rails.js           Continue Watching/Watchlist rails on the Nepu homepage
+  home-rails.js           Continue Watching/Watchlist/Recommended rails on the Nepu homepage
   theme.js              Modern Netflix UI theme class toggler
   theme.css             Modern Netflix UI glassmorphism stylesheet
 popup/                  Extension popup UI (Continue Watching, Watchlist, Subtitles, Settings)

@@ -18,6 +18,8 @@
   const relTrackToggle = document.getElementById('rel-track-toggle');
   const relNotifToggle = document.getElementById('rel-notif-toggle');
   const relIntervalSelect = document.getElementById('rel-interval-select');
+  const recEnabledToggle = document.getElementById('rec-enabled-toggle');
+  const recIntervalSelect = document.getElementById('rec-interval-select');
   const minDurationInput = document.getElementById('min-duration-input');
   const completedRange = document.getElementById('completed-range');
   const completedValueEl = document.getElementById('completed-value');
@@ -37,6 +39,8 @@
     relTrackToggle.checked = !!settings.releaseTrackingEnabled;
     relNotifToggle.checked = !!settings.desktopNotificationsEnabled;
     relIntervalSelect.value = String(settings.releaseCheckIntervalHours || 12);
+    recEnabledToggle.checked = settings.recommendationsEnabled !== false;
+    recIntervalSelect.value = String(settings.recommendationsCheckIntervalHours || 24);
     minDurationInput.value = settings.minDurationSeconds;
     completedRange.value = Math.round((settings.completedThreshold || 0) * 100);
     completedValueEl.textContent = completedRange.value;
@@ -69,6 +73,14 @@
     relIntervalSelect.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ releaseCheckIntervalHours: Number(relIntervalSelect.value) });
       chrome.runtime.sendMessage({ type: 'UPDATE_RELEASE_ALARM' });
+    });
+    recEnabledToggle.addEventListener('change', async () => {
+      state.settings = await NVT.setSettings({ recommendationsEnabled: recEnabledToggle.checked });
+      chrome.runtime.sendMessage({ type: 'UPDATE_RECOMMENDATIONS_ALARM' });
+    });
+    recIntervalSelect.addEventListener('change', async () => {
+      state.settings = await NVT.setSettings({ recommendationsCheckIntervalHours: Number(recIntervalSelect.value) });
+      chrome.runtime.sendMessage({ type: 'UPDATE_RECOMMENDATIONS_ALARM' });
     });
     minDurationInput.addEventListener('change', async () => {
       const v = Math.max(0, Math.round(Number(minDurationInput.value) || 0));
@@ -408,6 +420,49 @@
       relCheckNowBtn.disabled = false;
       await refreshReleaseStatusUI();
     }
+  });
+
+  // -------------------------------------------------------------------
+  // Recommended For You (TMDB-powered)
+  // -------------------------------------------------------------------
+  const recRefreshNowBtn = document.getElementById('rec-refresh-now-btn');
+  const recStatusEl = document.getElementById('rec-status');
+
+  function setRecStatusUI(message, kind) {
+    recStatusEl.textContent = message;
+    recStatusEl.style.color = kind === 'error' ? '#fca5a5' : kind === 'ok' ? '#8dffb0' : '';
+  }
+
+  async function refreshRecStatusUI() {
+    const [rec, settings] = await Promise.all([NVT.getRecommendations(), NVT.getSettings()]);
+    const bits = [settings.recommendationsEnabled !== false ? 'Recommendations enabled' : 'Recommendations disabled'];
+    if (rec.checking) {
+      bits.push('refreshing…');
+    } else if (rec.updatedAt) {
+      bits.push(`last refreshed ${new Date(rec.updatedAt).toLocaleString()}`);
+      bits.push(`${rec.items.length} item(s) · ${rec.reason || 'Recommended For You'}`);
+    }
+    if (rec.lastError) bits.push(`error: ${rec.lastError}`);
+    setRecStatusUI(bits.join(' · '), rec.lastError ? 'error' : settings.recommendationsEnabled !== false ? 'ok' : 'warn');
+  }
+
+  recRefreshNowBtn.addEventListener('click', async () => {
+    recRefreshNowBtn.disabled = true;
+    setRecStatusUI('Refreshing recommendations from TMDB…', 'info');
+    try {
+      const res = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: 'REFRESH_RECOMMENDATIONS_NOW' }, resolve);
+      });
+      if (!res || !res.ok) {
+        setRecStatusUI((res && res.error) || 'Refresh failed.', 'error');
+      }
+    } finally {
+      recRefreshNowBtn.disabled = false;
+      await refreshRecStatusUI();
+    }
+  });
+  refreshRecStatusUI().catch((err) => {
+    console.error('[Nepu Watch Tracker] recommendations status init failed:', err);
   });
   refreshReleaseStatusUI().catch((err) => {
     console.error('[Nepu Watch Tracker] release status init failed:', err);

@@ -84,6 +84,12 @@
         font-weight: 700;
         box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);
       }
+      .nvt-rail-badge.nvt-rail-rating {
+        background: rgba(11, 15, 25, 0.75) !important;
+        color: #fbbf24 !important;
+        font-weight: 700;
+        border: 1px solid rgba(251, 191, 36, 0.4);
+      }
       .nvt-rail-title {
         font-size: 12.5px;
         margin-top: 6px;
@@ -145,6 +151,24 @@
     return item.season != null && item.episode != null ? `S${item.season} E${item.episode}` : '';
   }
 
+  /** Recommendation cards have no direct nepu.is URL (TMDB IDs don't map
+   * to nepu's internal catalog IDs) — submit nepu's own live search form
+   * instead, exactly as if the user had typed the title and hit enter. */
+  function searchNepuFor(title) {
+    try {
+      const input = document.getElementById('search-input');
+      const form = document.getElementById('navbarToggler');
+      if (input && form && typeof form.submit === 'function') {
+        input.value = title;
+        form.submit();
+        return true;
+      }
+    } catch (err) {
+      console.debug('[Nepu Home Rails] search submit failed', err);
+    }
+    return false;
+  }
+
   function progressText(item, useTime) {
     if (useTime) return `${formatClock(item.currentTime)} / ${formatClock(item.duration)}`;
     const pct = Math.max(0, Math.min(100, Math.round((item.progress || 0) * 100)));
@@ -154,7 +178,15 @@
   function buildCard(item, mode, useTime) {
     const a = document.createElement('a');
     a.className = 'nvt-rail-card';
-    a.href = item.url;
+    if (mode === 'recommend') {
+      a.href = '#';
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        searchNepuFor(item.title);
+      });
+    } else {
+      a.href = item.url;
+    }
 
     const thumb = document.createElement('div');
     thumb.className = 'nvt-rail-thumb';
@@ -172,7 +204,14 @@
       thumb.appendChild(fallbackEl());
     }
 
-    if (mode === 'watchlist' && item.hasNewRelease && item.latestSeason != null && item.latestEpisode != null) {
+    if (mode === 'recommend') {
+      if (item.rating != null) {
+        const badge = document.createElement('div');
+        badge.className = 'nvt-rail-badge nvt-rail-rating';
+        badge.textContent = `★ ${item.rating}`;
+        thumb.appendChild(badge);
+      }
+    } else if (mode === 'watchlist' && item.hasNewRelease && item.latestSeason != null && item.latestEpisode != null) {
       const badge = document.createElement('div');
       badge.className = 'nvt-rail-badge nvt-rail-new-release';
       badge.textContent = `NEW S${item.latestSeason} E${item.latestEpisode}`;
@@ -252,10 +291,11 @@
         return;
       }
 
-      const [history, watchlist, settings] = await Promise.all([
+      const [history, watchlist, settings, recommendations] = await Promise.all([
         NVT.listHistory(),
         NVT.listWatchlist(),
         NVT.getSettings(),
+        NVT.getRecommendations(),
       ]);
 
       const continuing = (history || [])
@@ -274,7 +314,9 @@
         .sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
         .slice(0, 12);
 
-      if (!continuing.length && !watching.length) {
+      const recommended = settings.recommendationsEnabled !== false ? (recommendations.items || []).slice(0, 12) : [];
+
+      if (!continuing.length && !watching.length && !recommended.length) {
         removeWrapper();
         lastSignature = null;
         return;
@@ -283,6 +325,8 @@
       const signature = JSON.stringify({
         c: continuing.map((h) => [h.id, h.season, h.episode, Math.round((h.progress || 0) * 100), Math.round(h.currentTime || 0)]),
         w: watching.map((w) => [w.id, w.season, w.episode]),
+        r: recommended.map((r) => r.id),
+        reason: recommendations.reason || '',
         t: !!settings.useTimeProgress,
       });
 
@@ -307,8 +351,10 @@
 
       const continueSection = buildSection('Continue Watching', continuing, 'continue', settings.useTimeProgress);
       const watchlistSection = buildSection('Watchlist', watching, 'watchlist', settings.useTimeProgress);
+      const recommendSection = buildSection(recommendations.reason || 'Recommended For You', recommended, 'recommend', false);
       if (continueSection) wrapper.appendChild(continueSection);
       if (watchlistSection) wrapper.appendChild(watchlistSection);
+      if (recommendSection) wrapper.appendChild(recommendSection);
 
       anchor.parentElement.insertBefore(wrapper, anchor);
     } catch (err) {
@@ -344,7 +390,7 @@
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local') return;
       const relevant = Object.keys(changes).some(
-        (k) => k.startsWith(NVT.HIST_PREFIX) || k.startsWith(NVT.WL_PREFIX)
+        (k) => k.startsWith(NVT.HIST_PREFIX) || k.startsWith(NVT.WL_PREFIX) || k === NVT.RECOMMENDATIONS_KEY
       );
       if (relevant) scheduleRender(150);
     });
