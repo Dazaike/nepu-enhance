@@ -218,7 +218,6 @@ for tagged versions and downloadable source archives.
 - **NEW** badge + desktop notifications only if you were already caught up (not mid-season)
 - Watchlist reorder: **drag handle** (⋮⋮) instead of ▲/▼
 - Import/export: Continue Watching + Watchlist **opt-in** (off by default)
-- Dev auto-reload: `python3 dev/watch.py` + `dev/livereload.js` (crxreload-compatible)
 - Fix popup subtitle timing/style helpers (`__omp_shell` ReferenceError broke Search)
 
 #### 6.4.3

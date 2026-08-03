@@ -10,9 +10,7 @@
     "https://api.themoviedb.org/*",
     "https://*.themoviedb.org/*",
     "https://api.dropboxapi.com/*",
-    "https://content.dropboxapi.com/*",
-    "http://localhost:8080/*",
-    "http://127.0.0.1:8080/*"
+    "https://content.dropboxapi.com/*"
   ],
   "background": {
     "service_worker": "background.js"

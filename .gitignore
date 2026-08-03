@@ -6,3 +6,6 @@ Thumbs.db
 *.pem
 __pycache__/
 *.pyc
+
+# Local-only tools (not published to GitHub)
+dev/

@@ -1,13 +1,5 @@
 importScripts('common/store.js');
 
-// Dev auto-reload (https://github.com/wader/crxreload-compatible). Safe no-op
-// if the file is missing in a release zip. Run: python3 dev/watch.py
-try {
-  importScripts('dev/livereload.js');
-} catch (_) {
-  /* production / no livereload */
-}
-
 /**
  * NEPU_SUB_NET_FETCH: content/subtitles.js cannot reliably cross-origin
  * fetch OpenSubtitles/TMDB from a page's execution context.
