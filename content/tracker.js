@@ -116,9 +116,10 @@
       const progress = Math.min(1, Math.max(0, rawProgress));
       const settings = await NVT.getSettings();
       const completed = progress >= settings.completedThreshold;
+      const identity = getPageIdentity();
       const payload = Object.assign(
         {
-          ...getPageIdentity(),
+          ...identity,
           title: getTitle(),
           poster: getPoster(video),
           currentTime: video.currentTime,
@@ -131,19 +132,54 @@
       const shouldPersist =
         payload.progress >= settings.minProgressToTrack || payload.completed;
       if (!shouldPersist) return;
+
+      // Read prior row before write so we can detect "just finished" even though
+      // finished titles stay on Continue Watching (they no longer get deleted).
+      let prev = null;
+      try {
+        prev = await NVT.getHistoryFor(payload.host, payload.path);
+      } catch (_) {
+        prev = null;
+      }
+
       await NVT.upsertHistory(payload);
-      // Finished this episode → if Watchlist is still on the same S/E,
-      // move the bookmark to the next episode (e.g. E2 done → bookmark E3).
-      if (payload.completed) {
-        try {
-          await NVT.advanceWatchlistAfterEpisodeComplete(
-            payload.host,
-            payload.path,
-            payload.season,
-            payload.episode
-          );
-        } catch (advErr) {
-          console.debug('[NVT tracker] watchlist advance failed', advErr);
+
+      // Watchlist auto-bump is independent of CW staying visible: when this
+      // episode is finished, advance the bookmark (E2 done → E3) if it still
+      // points at the finished S/E. Idempotent; safe to retry if a prior run failed.
+      if (payload.completed && payload.season != null && payload.episode != null) {
+        const alreadyMarked =
+          prev &&
+          prev.watchlistAdvancedSeason === payload.season &&
+          prev.watchlistAdvancedEpisode === payload.episode;
+        const justFinished =
+          !prev ||
+          !prev.completed ||
+          prev.season !== payload.season ||
+          prev.episode !== payload.episode ||
+          !alreadyMarked;
+        if (justFinished) {
+          try {
+            const advanced = await NVT.advanceWatchlistAfterEpisodeComplete(
+              payload.host,
+              payload.path,
+              payload.season,
+              payload.episode
+            );
+            // Record that we handled this finish so we don't re-hit storage
+            // every 5s while the credits roll — still retries if advance was blocked
+            // (e.g. watchlist wasn't bookmarked yet) via !alreadyMarked next time.
+            if (advanced) {
+              await NVT.upsertHistory({
+                host: payload.host,
+                path: payload.path,
+                watchlistAdvancedSeason: payload.season,
+                watchlistAdvancedEpisode: payload.episode,
+              });
+            }
+          } catch (advErr) {
+            console.debug('[NVT tracker] watchlist advance failed', advErr);
+          }
         }
       }
     } catch (err) {

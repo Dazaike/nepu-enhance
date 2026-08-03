@@ -130,6 +130,7 @@
   const importBackupBtn = document.getElementById('import-backup-btn');
   const importBackupFile = document.getElementById('import-backup-file');
   const importReplaceToggle = document.getElementById('import-replace-toggle');
+  const backupIncludeWatchToggle = document.getElementById('backup-include-watch-toggle');
   const backupPassphraseInput = document.getElementById('backup-passphrase-input');
   const backupPassphraseConfirm = document.getElementById('backup-passphrase-confirm');
   const backupStatusEl = document.getElementById('backup-status');
@@ -180,13 +181,17 @@
       return;
     }
 
+    const includeWatchData = !!(backupIncludeWatchToggle && backupIncludeWatchToggle.checked);
     exportBackupBtn.disabled = true;
     setBackupStatus(
       passphrase ? 'Encrypting secrets and building backup…' : 'Building backup…',
       'info'
     );
     try {
-      const data = await NVT.exportBackup(passphrase ? { passphrase } : {});
+      const data = await NVT.exportBackup({
+        passphrase: passphrase || undefined,
+        includeWatchData,
+      });
       const d = new Date();
       const stamp = [
         d.getFullYear(),
@@ -194,9 +199,14 @@
         String(d.getDate()).padStart(2, '0'),
       ].join('');
       downloadJson(`nepu-watch-tracker-backup-${stamp}.json`, data);
-      const h = (data.history || []).filter((x) => x && !x.deleted).length;
-      const w = (data.watchlist || []).filter((x) => x && !x.deleted).length;
-      const bits = [`Exported ${h} history`, `${w} watchlist`, 'settings'];
+      const bits = ['settings'];
+      if (includeWatchData) {
+        const h = (data.history || []).filter((x) => x && !x.deleted).length;
+        const w = (data.watchlist || []).filter((x) => x && !x.deleted).length;
+        bits.unshift(`${h} history`, `${w} watchlist`);
+      } else {
+        bits.push('watch data omitted');
+      }
       if (data.secretsLocked) {
         bits.push('Dropbox + API keys locked with passphrase');
       } else {
@@ -207,7 +217,7 @@
           bits.push('API keys');
         }
       }
-      setBackupStatus(bits.join(' · ') + '.', 'ok');
+      setBackupStatus('Exported ' + bits.join(' · ') + '.', 'ok');
       clearBackupPassphraseFields();
     } catch (err) {
       setBackupStatus((err && err.message) || 'Export failed.', 'error');
@@ -226,10 +236,16 @@
     if (!file) return;
 
     const mode = importReplaceToggle.checked ? 'replace' : 'merge';
-    const confirmMsg =
-      mode === 'replace'
-        ? `Replace local Continue Watching, Watchlist, and settings with “${file.name}”? Items missing from the file will be removed. Dropbox tokens / API keys in the file will be restored. This cannot be undone.`
-        : `Merge “${file.name}” into this browser? For each item the newer copy wins. Dropbox tokens / API keys in the file will be restored.`;
+    const includeWatchData = !!(backupIncludeWatchToggle && backupIncludeWatchToggle.checked);
+    let confirmMsg;
+    if (includeWatchData) {
+      confirmMsg =
+        mode === 'replace'
+          ? `Replace local Continue Watching, Watchlist, and settings with “${file.name}”? Items missing from the file will be removed. Dropbox tokens / API keys in the file will be restored. This cannot be undone.`
+          : `Merge “${file.name}” into this browser (including Continue Watching & Watchlist)? For each item the newer copy wins. Dropbox tokens / API keys in the file will be restored.`;
+    } else {
+      confirmMsg = `Import “${file.name}” (settings / API keys / Dropbox only — Continue Watching & Watchlist will not be changed)?`;
+    }
     if (!confirm(confirmMsg)) {
       importBackupFile.value = '';
       return;
@@ -249,7 +265,7 @@
       let passphrase = readBackupPassphrase().trim();
       if (payload.secretsEncrypted && !passphrase) {
         passphrase = window.prompt(
-          'This backup’s Dropbox OAuth and API keys are passphrase-locked.\nEnter the passphrase (or cancel to import only history/watchlist/settings):'
+          'This backup’s Dropbox OAuth and API keys are passphrase-locked.\nEnter the passphrase (or cancel to import only non-secret fields):'
         );
         if (passphrase == null) {
           // User cancelled secrets unlock — strip encrypted block and continue without secrets
@@ -268,12 +284,14 @@
       const result = await NVT.importBackup(payload, {
         mode,
         passphrase: passphrase || undefined,
+        includeWatchData,
       });
-      const bits = [
-        mode === 'replace' ? 'Replaced from file' : 'Merged from file',
-        `${result.history} history`,
-        `${result.watchlist} watchlist`,
-      ];
+      const bits = [mode === 'replace' ? 'Replaced from file' : 'Merged from file'];
+      if (includeWatchData) {
+        bits.push(`${result.history} history`, `${result.watchlist} watchlist`);
+      } else {
+        bits.push('watch data skipped');
+      }
       if (result.settings) bits.push('settings updated');
       if (result.subtitleAuth) bits.push('API keys updated');
       if (result.dropboxAuth) bits.push('Dropbox OAuth restored');
@@ -539,7 +557,7 @@
 
       const curSe = item.season != null && item.episode != null ? `S${item.season} E${item.episode}` : 'Bookmarked';
       const latestSe = item.latestSeason != null && item.latestEpisode != null
-        ? ` · Latest: S${item.latestSeason} E${item.latestEpisode}${item.hasNewRelease ? ' (NEW)' : ''}${NVT.isWatchlistCaughtUp(item) ? ' · Complete' : ''}`
+        ? ` · Latest aired: S${item.latestSeason} E${item.latestEpisode}${item.hasNewRelease ? ' (NEW)' : ''}${NVT.watchlistProgressLabel(item) ? ' · ' + NVT.watchlistProgressLabel(item) : ''}`
         : '';
 
       div.innerHTML = `

@@ -1,5 +1,13 @@
 importScripts('common/store.js');
 
+// Dev auto-reload (https://github.com/wader/crxreload-compatible). Safe no-op
+// if the file is missing in a release zip. Run: python3 dev/watch.py
+try {
+  importScripts('dev/livereload.js');
+} catch (_) {
+  /* production / no livereload */
+}
+
 /**
  * NEPU_SUB_NET_FETCH: content/subtitles.js cannot reliably cross-origin
  * fetch OpenSubtitles/TMDB from a page's execution context.
@@ -324,6 +332,109 @@ async function tmdbFetch(path, query, apiKey) {
   return resp.json().catch(() => null);
 }
 
+/** Local calendar date YYYY-MM-DD (not UTC — avoids off-by-one near midnight). */
+function localTodayString() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function seBefore(season, episode) {
+  const s = Number(season);
+  const e = Number(episode);
+  if (!Number.isFinite(s) || !Number.isFinite(e)) return null;
+  if (e > 1) return { season: s, episode: e - 1 };
+  if (s > 1) return { season: s - 1, episode: null }; // unknown last ep of prior season
+  return null;
+}
+
+/**
+ * Resolve the last episode that has actually aired (air_date <= today).
+ * A scheduled next_episode_to_air with a future air date always wins as the
+ * boundary: last available = episode before that next (so "Caught up" works
+ * when the user finished everything out now and the next one is e.g. Wednesday).
+ */
+function resolveLastAiredEpisode(series, today) {
+  if (!series) return null;
+  const last = series.last_episode_to_air;
+  const next = series.next_episode_to_air;
+
+  const nextS = next && next.season_number != null ? Number(next.season_number) : NaN;
+  const nextE = next && next.episode_number != null ? Number(next.episode_number) : NaN;
+  const nextAir = (next && next.air_date) || '';
+  const nextIsFuture =
+    Number.isFinite(nextS) &&
+    Number.isFinite(nextE) &&
+    (!!nextAir ? nextAir > today : true); // no date + listed as next → treat as not out yet
+
+  // If TMDB advertises a not-yet-out next ep, never treat that ep (or anything
+  // at/after it) as "latest aired".
+  if (nextIsFuture && nextE > 1) {
+    const before = seBefore(nextS, nextE);
+    if (before && before.episode != null) {
+      // Prefer last_episode_to_air when it is clearly earlier and already aired.
+      if (last && last.season_number != null && last.episode_number != null) {
+        const ls = Number(last.season_number);
+        const le = Number(last.episode_number);
+        const lastAir = last.air_date || '';
+        const lastAired = lastAir && lastAir <= today;
+        const lastBeforeNext =
+          ls < nextS || (ls === nextS && le < nextE);
+        if (lastAired && lastBeforeNext) {
+          return {
+            season: ls,
+            episode: le,
+            airDate: lastAir,
+            title: last.name || '',
+          };
+        }
+      }
+      return {
+        season: before.season,
+        episode: before.episode,
+        airDate: '',
+        title: '',
+      };
+    }
+  }
+
+  if (last && last.season_number != null && last.episode_number != null) {
+    const airDate = last.air_date || '';
+    // Require a real past/today air date — empty date is not proof it aired
+    // (TMDB sometimes stubs the next ep as last without a solid date).
+    if (airDate && airDate <= today) {
+      // Still clamp if next is future and last >= next (bad TMDB data).
+      if (nextIsFuture && Number.isFinite(nextS) && Number.isFinite(nextE)) {
+        const ls = Number(last.season_number);
+        const le = Number(last.episode_number);
+        if (ls > nextS || (ls === nextS && le >= nextE)) {
+          const before = seBefore(nextS, nextE);
+          if (before && before.episode != null) {
+            return { season: before.season, episode: before.episode, airDate: '', title: '' };
+          }
+        }
+      }
+      return {
+        season: Number(last.season_number),
+        episode: Number(last.episode_number),
+        airDate,
+        title: last.name || '',
+      };
+    }
+    // Future-dated last_episode_to_air: step back one in-season.
+    if (airDate && airDate > today) {
+      const before = seBefore(last.season_number, last.episode_number);
+      if (before && before.episode != null) {
+        return { season: before.season, episode: before.episode, airDate: '', title: '' };
+      }
+    }
+  }
+
+  return null;
+}
+
 async function checkNewReleases(force) {
   try {
     const settings = await NVT.getSettings();
@@ -346,7 +457,7 @@ async function checkNewReleases(force) {
     const tvItems = watchlist.filter((item) => item && item.mediaType === 'tv' && !optOuts.has(item.id));
 
     let newReleasesFound = 0;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localTodayString();
 
     for (const item of tvItems) {
       try {
@@ -370,24 +481,48 @@ async function checkNewReleases(force) {
         if (!seriesId) continue;
 
         const series = await tmdbFetch(`/tv/${seriesId}`, {}, apiKey);
-        if (!series || !series.last_episode_to_air) continue;
+        if (!series) continue;
 
-        const lastEp = series.last_episode_to_air;
-        const s = lastEp.season_number;
-        const e = lastEp.episode_number;
-        const airDate = lastEp.air_date || '';
+        // Only count episodes that have actually aired (air_date <= today).
+        // TMDB sometimes lists a not-yet-out ep as last_episode_to_air; if so,
+        // fall back to the episode before next_episode_to_air / last − 1.
+        const aired = resolveLastAiredEpisode(series, today);
+        if (!aired) continue;
+
+        const s = aired.season;
+        const e = aired.episode;
+        const airDate = aired.airDate || '';
+
+        // Upcoming (not yet out) — for display only, never triggers NEW/notify.
+        const nextEp = series.next_episode_to_air;
+        const nextSeason =
+          nextEp && nextEp.season_number != null ? Number(nextEp.season_number) : null;
+        const nextEpisode =
+          nextEp && nextEp.episode_number != null ? Number(nextEp.episode_number) : null;
+        const nextAirDate = (nextEp && nextEp.air_date) || '';
 
         const curSeason = item.season != null ? Number(item.season) : 0;
         const curEpisode = item.episode != null ? Number(item.episode) : 0;
 
         const isNewer = s > curSeason || (s === curSeason && e > curEpisode);
-        const hasAired = !!airDate && airDate <= today;
-
         const hadNewReleaseBefore = !!item.hasNewRelease;
-        const hasNewRelease = isNewer && hasAired;
 
-        // Always store latest S/E so the popup can show "Complete" when the
-        // bookmark is at or past the last aired episode (not only when NEW flips).
+        // Previous known last-aired (before this write).
+        const prevLatS = item.latestSeason != null ? Number(item.latestSeason) : NaN;
+        const prevLatE = item.latestEpisode != null ? Number(item.latestEpisode) : NaN;
+        // User is on/past the previous latest → they were caught up with what we knew.
+        const wasCaughtUp =
+          Number.isFinite(prevLatS) &&
+          Number.isFinite(prevLatE) &&
+          (curSeason > prevLatS || (curSeason === prevLatS && curEpisode >= prevLatE));
+
+        // NEW badge + notifications only when the user was already caught up and
+        // something newer has aired. Mid-season (e.g. on E7 while E13 is out) is
+        // not "new episode" — they already have more to watch without a badge.
+        // Re-check while still on that bookmark keeps NEW until they advance/clear.
+        // Stale NEW from older logic clears when wasCaughtUp is false.
+        const hasNewRelease = isNewer && wasCaughtUp;
+
         const updated = {
           ...item,
           tmdbId: seriesId,
@@ -395,19 +530,27 @@ async function checkNewReleases(force) {
           latestSeason: s,
           latestEpisode: e,
           latestAirDate: airDate,
-          latestTitle: lastEp.name || '',
+          latestTitle: aired.title || '',
+          nextSeason: Number.isFinite(nextSeason) ? nextSeason : null,
+          nextEpisode: Number.isFinite(nextEpisode) ? nextEpisode : null,
+          nextAirDate: nextAirDate || '',
+          seriesStatus: series.status || '',
           lastReleaseCheckAt: Date.now(),
         };
         await NVT.putWatchlistRaw(updated);
 
-        if (hasNewRelease && !hadNewReleaseBefore && settings.desktopNotificationsEnabled) {
+        if (
+          hasNewRelease &&
+          !hadNewReleaseBefore &&
+          settings.desktopNotificationsEnabled
+        ) {
           newReleasesFound++;
           try {
             chrome.notifications.create('nepu-rel-' + item.id, {
               type: 'basic',
               iconUrl: 'icons/icon128.png',
               title: `New Episode: ${item.title}`,
-              message: `Season ${s}, Episode ${e} (${lastEp.name || 'Latest'}) is out now! Click to open.`,
+              message: `Season ${s}, Episode ${e} (${aired.title || 'Latest'}) is out now! Click to open.`,
               priority: 2,
             });
           } catch (notifErr) {

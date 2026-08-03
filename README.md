@@ -3,7 +3,7 @@
 Chrome **Manifest V3** extension for [Nepu](https://nepu.to/) and its mirrors
 (`nepu.is`, `nepu.net`).
 
-**Current version: 6.4.3**
+**Current version: 6.4.4**
 
 ## Highlights
 
@@ -34,6 +34,11 @@ saves on pause, end, tab hide, and every few seconds while playing. Reopen the
 popup or revisit the page to resume — episode-aware, so the next episode of a
 show updates the same entry instead of duplicating it.
 
+Finished episodes **stay** in Continue Watching (full progress bar, no “show
+finished” badge) until you remove them manually. They never auto-drop when an
+episode or movie ends. Finishing still **auto-advances the Watchlist** when the
+bookmark was on that S/E.
+
 On the homepage **Continue Watching** rail, hover a poster and click **×** to
 remove that entry (same as remove in the popup).
 
@@ -48,13 +53,14 @@ the Watchlist entry automatically moves to the **next** episode (same season,
 episode + 1), but **not past** the last aired episode TMDB knows about.
 Open from Watchlist uses the updated episode URL when possible.
 
-**Complete** status: after a release check, if your bookmark is at or past
-the latest aired episode, Watchlist shows **Complete** (list: next to S/E;
-grid / homepage rail: top-right badge). **NEW** still takes priority when
-something newer has aired.
+**Watchlist status** (after a release check):
+- **Caught up** — on last *aired* ep, but a later ep is still scheduled
+- **Finished** — on last aired ep and nothing further is scheduled (or series ended)
+- **NEW** — only if you were already caught up and a newer ep has aired (not mid-season)
+Desktop notifications use the same “was caught up” rule.
 
-**Reorder:** use the ▲ / ▼ controls on each Watchlist row (list and grid)
-to change order; order is saved and used on the homepage rail too.
+**Reorder:** drag the grip handle (⋮⋮) on each Watchlist item (list and grid);
+order is saved and used on the homepage rail too.
 
 ### Homepage rails
 
@@ -112,23 +118,24 @@ minute**, so devices stay close without spamming Dropbox.
 
 On the **Options** page, **Import & export** downloads or restores a JSON backup:
 
-- Continue Watching history, Watchlist, and settings
-- OpenSubtitles / TMDB API keys
-- Dropbox OAuth (app key + refresh/access tokens) so you can restore sync without reconnecting
+- Settings, OpenSubtitles / TMDB API keys, and Dropbox OAuth (always)
+- Continue Watching + Watchlist only if you enable **Include Continue Watching & Watchlist**
+  (off by default, so backups don’t overwrite progress by accident)
 
-Optional **passphrase**: AES-GCM-encrypts Dropbox tokens and API keys (PBKDF2);
-history / watchlist / settings stay readable. Leave blank for plaintext secrets —
-treat the file like a password. Import can **merge** (newest wins) or **replace**
-local data. Dropbox cloud sync files are also accepted for offline restore of
-history / watchlist / settings.
+Optional **passphrase**: AES-GCM-encrypts Dropbox tokens and API keys (PBKDF2).
+Leave blank for plaintext secrets — treat the file like a password. Import can
+**merge** (newest wins) or **replace** local data when watch data is included.
+Dropbox cloud sync files are also accepted when you opt into watch data.
 
 ### New release tracking & notifications
 
 Background TMDB checks for Watchlist TV shows:
 
 - Configurable interval (6 / 12 / 24 hours)
-- Green **NEW Sx Ey** badge in the popup and on the homepage Watchlist rail
-- Desktop notifications when a new episode first appears
+- Green **NEW Sx Ey** only if you were **already caught up** and something newer aired
+- Desktop notifications use the same rule (no NEW spam mid-season)
+- **Caught up** when you’re on the last aired ep and more may still come
+- **Finished** when you’re on the last aired ep and nothing is left / series ended
 - **Clear NEW / mark caught up:**
   - Popup list view → green **✓**
   - Popup grid view → click the **NEW** badge
@@ -160,7 +167,7 @@ Toggle: **Modern Netflix UI on Nepu** (options / popup settings).
 | Auto-apply captions on Nepu | Auto-search + load when none loaded |
 | Show time instead of percentage | `12:34 / 45:00` vs `28%` |
 | Minimum video length to track | Ignore short clips |
-| Mark watched at % | Drop from CW when progress is high enough |
+| Mark watched at % | Treat as finished (Watchlist advance; no auto-resume at end) |
 | Auto-sync with Dropbox | Background every 5 min + on Nepu page open |
 | Sync on CW / Watchlist changes | Push soon after local edits (max 1× / min) |
 | Track new episode releases | TMDB background checks |
@@ -202,14 +209,24 @@ for tagged versions and downloadable source archives.
 
 ### Changelog (recent)
 
+#### 6.4.4
+
+- Continue Watching: finished episodes **stay** until removed (full bar / 100%, no “show finished” badge)
+- Watchlist still **auto-advances** when an episode finishes
+- Watchlist status: **Caught up** (more scheduled) vs **Finished** (nothing left / series ended)
+- Soft **Caught up** when you’re on the last available ep and the next airs later (e.g. Wednesday)
+- **NEW** badge + desktop notifications only if you were already caught up (not mid-season)
+- Watchlist reorder: **drag handle** (⋮⋮) instead of ▲/▼
+- Import/export: Continue Watching + Watchlist **opt-in** (off by default)
+- Dev auto-reload: `python3 dev/watch.py` + `dev/livereload.js` (crxreload-compatible)
+- Fix popup subtitle timing/style helpers (`__omp_shell` ReferenceError broke Search)
+
 #### 6.4.3
 
-- Watchlist **Complete** badge when you’re caught up with all aired episodes (TMDB latest S/E)
-- Release checks always store latest season/episode (not only when NEW flips)
-- Watchlist **reorder** (▲ / ▼) in popup list & grid; order shared with homepage rail
-- Finish-advance no longer bumps past the last known aired episode
-- **Dropbox auto-sync:** real 5‑minute background alarm (was page-open only); re-sync on tab focus
-- **Sync on changes** toggle: CW progress / Watchlist edits trigger Dropbox sync (max once per minute)
+- Watchlist Complete / release-check latest S/E storage
+- Finish-advance no longer bumps past last known aired episode
+- Dropbox auto-sync: 5‑minute background alarm; re-sync on tab focus; sync-on-change (1×/min)
+- Watchlist reorder (arrow controls; replaced by drag in 6.4.4)
 
 #### 6.0.1
 

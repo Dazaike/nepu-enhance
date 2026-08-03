@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Nepu Watch Tracker & Subtitles",
-  "version": "6.4.3",
+  "version": "6.4.4",
   "description": "Continue Watching, a Watchlist, and OpenSubtitles captions for Nepu (nepu.to / nepu.is / nepu.net).",
   "permissions": ["storage", "scripting", "activeTab", "tabs", "identity", "notifications", "alarms"],
   "host_permissions": [
@@ -10,7 +10,9 @@
     "https://api.themoviedb.org/*",
     "https://*.themoviedb.org/*",
     "https://api.dropboxapi.com/*",
-    "https://content.dropboxapi.com/*"
+    "https://content.dropboxapi.com/*",
+    "http://localhost:8080/*",
+    "http://127.0.0.1:8080/*"
   ],
   "background": {
     "service_worker": "background.js"

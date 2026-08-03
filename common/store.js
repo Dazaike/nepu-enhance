@@ -166,12 +166,20 @@ const NVT = (() => {
     return (items || []).slice().sort(compareWatchlistOrder);
   }
 
+  function localTodayString() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   /**
-   * True when TMDB latest S/E is known and the bookmark is at or past it
-   * (caught up with everything that has aired — show "Complete").
+   * True when TMDB last *aired* S/E is known and the bookmark is at or past it
+   * (ignores hasNewRelease so label helpers can still classify).
    */
-  function isWatchlistCaughtUp(item) {
-    if (!item || item.hasNewRelease) return false;
+  function isAtOrPastLatestAired(item) {
+    if (!item) return false;
     const latS = item.latestSeason != null ? Number(item.latestSeason) : NaN;
     const latE = item.latestEpisode != null ? Number(item.latestEpisode) : NaN;
     const curS = item.season != null ? Number(item.season) : NaN;
@@ -179,6 +187,82 @@ const NVT = (() => {
     if (!Number.isFinite(latS) || !Number.isFinite(latE)) return false;
     if (!Number.isFinite(curS) || !Number.isFinite(curE)) return false;
     return curS > latS || (curS === latS && curE >= latE);
+  }
+
+  /** True when nextSeason/nextEpisode is scheduled and not yet out. */
+  function hasUpcomingNextEpisode(item) {
+    if (!item) return false;
+    const ns = item.nextSeason != null ? Number(item.nextSeason) : NaN;
+    const ne = item.nextEpisode != null ? Number(item.nextEpisode) : NaN;
+    if (!Number.isFinite(ns) || !Number.isFinite(ne)) return false;
+    const air = item.nextAirDate ? String(item.nextAirDate).slice(0, 10) : '';
+    if (air) return air > localTodayString();
+    // Listed as next with no date — treat as upcoming (not available yet).
+    return true;
+  }
+
+  /**
+   * Soft catch-up: bookmark is the episode immediately before a not-yet-out
+   * next ep (e.g. on E4, next is E5 Wednesday). Works even if latestSeason
+   * was stored wrong / missing from a bad check.
+   */
+  function isSoftCaughtUpBeforeNext(item) {
+    if (!item || !hasUpcomingNextEpisode(item)) return false;
+    const ns = Number(item.nextSeason);
+    const ne = Number(item.nextEpisode);
+    const curS = item.season != null ? Number(item.season) : NaN;
+    const curE = item.episode != null ? Number(item.episode) : NaN;
+    if (!Number.isFinite(curS) || !Number.isFinite(curE)) return false;
+    if (curS === ns && ne > 1 && curE === ne - 1) return true;
+    // Bookmark already pushed to the upcoming ep number (finish-advance) but
+    // it hasn't aired — still "caught up for now".
+    if (curS === ns && curE === ne) return true;
+    return false;
+  }
+
+  /**
+   * Caught up for now: finished everything that has aired; more may still come.
+   */
+  function isWatchlistCaughtUp(item) {
+    if (!item || item.hasNewRelease) return false;
+    if (isSoftCaughtUpBeforeNext(item)) return true;
+    if (!isAtOrPastLatestAired(item)) return false;
+    return !isWatchlistSeriesComplete(item);
+  }
+
+  /**
+   * Nothing left to watch: on last aired ep and either the series has ended
+   * or TMDB lists no upcoming next episode. Label: "Finished".
+   */
+  function isWatchlistSeriesComplete(item) {
+    if (!item || item.hasNewRelease) return false;
+    // Upcoming next ep scheduled → not finished (that's "Caught up").
+    if (hasUpcomingNextEpisode(item)) return false;
+    if (!isAtOrPastLatestAired(item)) return false;
+    const status = String(item.seriesStatus || '').toLowerCase();
+    if (status === 'ended' || status === 'canceled' || status === 'cancelled') {
+      return true;
+    }
+    const hasNextListed =
+      item.nextSeason != null &&
+      item.nextEpisode != null &&
+      Number.isFinite(Number(item.nextSeason)) &&
+      Number.isFinite(Number(item.nextEpisode));
+    // No next at all → finished. Next with past air date is treated as available
+    // elsewhere (should have become latest); if still listed, not "finished".
+    return !hasNextListed;
+  }
+
+  /** Short UI label: "Finished" | "Caught up" | "" */
+  function watchlistProgressLabel(item) {
+    if (!item) return '';
+    // Soft catch-up wins even if a stale hasNewRelease flag is set (e.g. a
+    // future ep was briefly treated as latest). Upcoming next = not "NEW".
+    if (isSoftCaughtUpBeforeNext(item)) return 'Caught up';
+    if (item.hasNewRelease) return '';
+    if (isWatchlistSeriesComplete(item)) return 'Finished';
+    if (isAtOrPastLatestAired(item)) return 'Caught up';
+    return '';
   }
 
   async function addWatchlist(item) {
@@ -351,11 +435,16 @@ const NVT = (() => {
   }
 
   /**
-   * When Continue Watching marks an episode finished: if that show is on
-   * the Watchlist and the bookmark still points at the finished episode,
-   * advance the bookmark to the next episode (same season, episode + 1).
+   * When an episode is marked finished (CW "Finished" / completed threshold):
+   * if that show is on the Watchlist and the bookmark still points at the
+   * finished episode, advance the bookmark to the next episode (same season,
+   * episode + 1). Independent of Continue Watching list membership — finished
+   * CW cards stay until removed manually; the Watchlist still bumps.
+   *
    * Idempotent — once advanced, later complete saves no longer match.
    * Never auto-adds; movies / missing S/E are left alone.
+   * Returns the updated entry, the unchanged entry when already past latest,
+   * or null when nothing applied (not bookmarked / S/E mismatch).
    */
   async function advanceWatchlistAfterEpisodeComplete(host, path, season, episode) {
     const s = season != null && season !== '' ? Number(season) : NaN;
@@ -368,6 +457,8 @@ const NVT = (() => {
     const curS = existing.season != null ? Number(existing.season) : NaN;
     const curE = existing.episode != null ? Number(existing.episode) : NaN;
     if (!Number.isFinite(curS) || !Number.isFinite(curE)) return null;
+    // Already past this finish (e.g. user opened the next episode first) — ok.
+    if (curS > s || (curS === s && curE > e)) return existing;
     if (curS !== s || curE !== e) return null;
 
     // Don't advance past the last known aired episode (keeps "Complete" honest).
@@ -386,6 +477,11 @@ const NVT = (() => {
       mediaType: existing.mediaType || 'tv',
       path: rewriteEpisodeRef(existing.path, s, nextEpisode) || existing.path,
       url: rewriteEpisodeRef(existing.url, s, nextEpisode) || existing.url,
+      // Finishing the bookmarked ep catches you up past any NEW for that ep.
+      hasNewRelease:
+        Number.isFinite(latS) && Number.isFinite(latE)
+          ? s < latS || (s === latS && nextEpisode < latE)
+          : false,
       updatedAt: Date.now(),
       deleted: false,
     };
@@ -604,16 +700,19 @@ const NVT = (() => {
    * Dropbox sync JSON shape (history + watchlist + settings) plus subtitle
    * API keys and Dropbox OAuth (app key + refresh/access tokens).
    *
-   * @param {{ passphrase?: string }} [opts]
+   * @param {{ passphrase?: string, includeWatchData?: boolean }} [opts]
+   *   includeWatchData — if true, include Continue Watching + Watchlist.
+   *   Default false (settings / API keys / Dropbox OAuth only) so backups
+   *   don’t overwrite watch progress across devices by accident.
    *   If passphrase is set, Dropbox OAuth + subtitle keys are AES-GCM encrypted
-   *   into `secretsEncrypted` (PBKDF2). History/watchlist/settings stay plain
-   *   so the file is still useful without unlocking secrets.
+   *   into `secretsEncrypted` (PBKDF2).
    */
   async function exportBackup(opts) {
     const passphrase = opts && opts.passphrase ? String(opts.passphrase) : '';
+    const includeWatchData = !!(opts && opts.includeWatchData);
     const [history, watchlist, settings, subtitleAuth, dropboxAuth] = await Promise.all([
-      listHistory(true),
-      listWatchlist(true),
+      includeWatchData ? listHistory(true) : Promise.resolve([]),
+      includeWatchData ? listWatchlist(true) : Promise.resolve([]),
       getSettings(),
       getSubtitleAuth(),
       getDropboxAuth(),
@@ -631,10 +730,14 @@ const NVT = (() => {
       format: BACKUP_FORMAT,
       version: BACKUP_VERSION,
       exportedAt: Date.now(),
-      history,
-      watchlist,
+      includeWatchData,
       settings,
     };
+
+    if (includeWatchData) {
+      base.history = history;
+      base.watchlist = watchlist;
+    }
 
     if (passphrase) {
       base.secretsEncrypted = await encryptSecretsBlob(secrets, passphrase);
@@ -670,14 +773,17 @@ const NVT = (() => {
 
   /**
    * @param {object} payload - exportBackup() JSON or Dropbox sync file
-   * @param {{ mode?: 'merge' | 'replace', passphrase?: string }} [opts]
+   * @param {{ mode?: 'merge' | 'replace', passphrase?: string, includeWatchData?: boolean }} [opts]
    *   merge   — newest-wins per id (default; safe for multi-device)
-   *   replace — overwrite history/watchlist/settings with the file
+   *   replace — overwrite history/watchlist/settings with the file (only when includeWatchData)
    *   passphrase — unlock secretsEncrypted (Dropbox OAuth + API keys)
+   *   includeWatchData — if true, import Continue Watching + Watchlist.
+   *   Default false so importing settings/keys won’t overwrite local progress.
    */
   async function importBackup(payload, opts) {
     const mode = (opts && opts.mode) === 'replace' ? 'replace' : 'merge';
     const passphrase = opts && opts.passphrase ? String(opts.passphrase) : '';
+    const includeWatchData = !!(opts && opts.includeWatchData);
     if (!payload || typeof payload !== 'object') {
       throw new Error('Invalid backup file (not a JSON object).');
     }
@@ -694,8 +800,10 @@ const NVT = (() => {
       unlockedSecrets = await decryptSecretsBlob(payload.secretsEncrypted, passphrase);
     }
 
-    const incomingHistory = Array.isArray(payload.history) ? payload.history : null;
-    const incomingWatchlist = Array.isArray(payload.watchlist) ? payload.watchlist : null;
+    const incomingHistory =
+      includeWatchData && Array.isArray(payload.history) ? payload.history : null;
+    const incomingWatchlist =
+      includeWatchData && Array.isArray(payload.watchlist) ? payload.watchlist : null;
     const incomingSettings =
       payload.settings && typeof payload.settings === 'object' ? payload.settings : null;
     const incomingSub =
@@ -717,7 +825,9 @@ const NVT = (() => {
       !incomingDropbox
     ) {
       throw new Error(
-        'Backup has no history, watchlist, settings, API keys, or Dropbox auth to import.'
+        includeWatchData
+          ? 'Backup has no history, watchlist, settings, API keys, or Dropbox auth to import.'
+          : 'Backup has no settings, API keys, or Dropbox auth to import. Enable “Include Continue Watching & Watchlist” to import watch data.'
       );
     }
 
@@ -742,7 +852,7 @@ const NVT = (() => {
           : mergeListsById(localWatchlist, incomingWatchlist);
     }
 
-    if (mode === 'replace' && (incomingHistory || incomingWatchlist)) {
+    if (mode === 'replace' && includeWatchData && (incomingHistory || incomingWatchlist)) {
       // Tombstone anything local that is not present in the replace set so
       // Dropbox-style soft-deletes and listHistory(false) stay consistent.
       const keepHist = new Set(nextHistory.map((h) => h.id));
@@ -761,11 +871,14 @@ const NVT = (() => {
     }
 
     const writes = [];
-    for (const h of nextHistory) {
-      if (h && h.id) writes.push(putHistoryRaw(h));
-    }
-    for (const w of nextWatchlist) {
-      if (w && w.id) writes.push(putWatchlistRaw(w));
+    // Only touch CW / Watchlist storage when the user opted into watch data.
+    if (includeWatchData && (incomingHistory || incomingWatchlist)) {
+      for (const h of nextHistory) {
+        if (h && h.id) writes.push(putHistoryRaw(h));
+      }
+      for (const w of nextWatchlist) {
+        if (w && w.id) writes.push(putWatchlistRaw(w));
+      }
     }
 
     let nextSettings = localSettings;
@@ -820,8 +933,11 @@ const NVT = (() => {
 
     return {
       mode,
-      history: nextHistory.filter((h) => h && !h.deleted).length,
-      watchlist: nextWatchlist.filter((w) => w && !w.deleted).length,
+      includeWatchData,
+      history: includeWatchData ? nextHistory.filter((h) => h && !h.deleted).length : 0,
+      watchlist: includeWatchData ? nextWatchlist.filter((w) => w && !w.deleted).length : 0,
+      historyImported: !!incomingHistory,
+      watchlistImported: !!incomingWatchlist,
       settings: nextSettings !== localSettings,
       subtitleAuth: !!(incomingSub && (incomingSub.osApiKey || incomingSub.tmdbApiKey)),
       dropboxAuth: restoredDropbox,
@@ -860,6 +976,8 @@ const NVT = (() => {
     compareWatchlistOrder,
     sortWatchlist,
     isWatchlistCaughtUp,
+    isWatchlistSeriesComplete,
+    watchlistProgressLabel,
     reorderWatchlist,
     moveWatchlistItem,
     getSubtitleAuth,

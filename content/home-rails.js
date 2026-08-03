@@ -139,6 +139,25 @@
         box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
         border: none;
       }
+      .nvt-rail-badge.nvt-rail-series-complete {
+        top: 6px;
+        left: auto;
+        right: 6px;
+        background: rgba(124, 58, 237, 0.92) !important;
+        color: #f5f3ff !important;
+        font-weight: 700;
+        box-shadow: 0 2px 6px rgba(124, 58, 237, 0.35);
+        border: none;
+      }
+      .nvt-rail-badge.nvt-rail-finished {
+        top: 6px;
+        left: auto;
+        right: 6px;
+        background: rgba(107, 114, 128, 0.92) !important;
+        color: #f9fafb !important;
+        font-weight: 700;
+        border: none;
+      }
       .nvt-rail-remove {
         position: absolute;
         top: 6px;
@@ -579,6 +598,8 @@
   }
 
   function progressText(item, useTime) {
+    // Episode progress only — don’t say "Finished" (reads like the whole show).
+    if (item && item.completed) return '100%';
     if (useTime) return `${formatClock(item.currentTime)} / ${formatClock(item.duration)}`;
     const pct = Math.max(0, Math.min(100, Math.round((item.progress || 0) * 100)));
     return `${pct}%`;
@@ -630,37 +651,50 @@
         badge.textContent = `★ ${item.rating}`;
         thumb.appendChild(badge);
       }
-    } else if (mode === 'watchlist' && item.hasNewRelease && item.latestSeason != null && item.latestEpisode != null) {
-      const badge = document.createElement('button');
-      badge.type = 'button';
-      badge.className = 'nvt-rail-badge nvt-rail-new-release nvt-rail-clear-new';
-      badge.textContent = `NEW S${item.latestSeason} E${item.latestEpisode}`;
-      badge.title = 'Clear NEW badge (mark caught up)';
-      badge.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        try {
-          await NVT.clearNewReleaseBadge(item.id);
-          scheduleRender(50);
-        } catch (err) {
-          console.debug('[Nepu Home Rails] clear NEW failed', err);
-        }
-      });
-      thumb.appendChild(badge);
     } else if (mode === 'watchlist') {
-      const se = seLabel(item);
-      if (se) {
-        const badge = document.createElement('div');
-        badge.className = 'nvt-rail-badge';
-        badge.textContent = se;
+      const progressLabel = NVT.watchlistProgressLabel(item);
+      const hasNew =
+        !progressLabel &&
+        item.hasNewRelease &&
+        item.latestSeason != null &&
+        item.latestEpisode != null;
+      if (hasNew) {
+        const badge = document.createElement('button');
+        badge.type = 'button';
+        badge.className = 'nvt-rail-badge nvt-rail-new-release nvt-rail-clear-new';
+        badge.textContent = `NEW S${item.latestSeason} E${item.latestEpisode}`;
+        badge.title = 'Clear NEW badge (mark caught up)';
+        badge.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            await NVT.clearNewReleaseBadge(item.id);
+            scheduleRender(50);
+          } catch (err) {
+            console.debug('[Nepu Home Rails] clear NEW failed', err);
+          }
+        });
         thumb.appendChild(badge);
-      }
-      if (NVT.isWatchlistCaughtUp(item)) {
-        const done = document.createElement('div');
-        done.className = 'nvt-rail-badge nvt-rail-complete';
-        done.textContent = 'Complete';
-        done.title = 'Caught up with all aired episodes';
-        thumb.appendChild(done);
+      } else {
+        const se = seLabel(item);
+        if (se) {
+          const badge = document.createElement('div');
+          badge.className = 'nvt-rail-badge';
+          badge.textContent = se;
+          thumb.appendChild(badge);
+        }
+        if (progressLabel) {
+          const done = document.createElement('div');
+          done.className =
+            'nvt-rail-badge ' +
+            (progressLabel === 'Finished' ? 'nvt-rail-series-complete' : 'nvt-rail-complete');
+          done.textContent = progressLabel;
+          done.title =
+            progressLabel === 'Finished'
+              ? 'No more episodes left — show is done for you'
+              : 'Caught up with all aired episodes (more may come later)';
+          thumb.appendChild(done);
+        }
       }
     } else {
       const se = seLabel(item);
@@ -673,7 +707,9 @@
     }
 
     if (mode === 'continue') {
-      const pct = Math.max(0, Math.min(100, Math.round((item.progress || 0) * 100)));
+      const pct = item.completed
+        ? 100
+        : Math.max(0, Math.min(100, Math.round((item.progress || 0) * 100)));
       const track = document.createElement('div');
       track.className = 'nvt-rail-progress';
       const fill = document.createElement('div');
@@ -681,6 +717,9 @@
       fill.style.width = pct + '%';
       track.appendChild(fill);
       thumb.appendChild(track);
+
+      // No "Finished" badge on CW cards — full progress bar is enough and
+      // avoids looking like the entire series is done.
 
       // Remove from Continue Watching (same as popup ✕) without navigating.
       const removeBtn = document.createElement('button');
@@ -772,14 +811,9 @@
         NVT.getRecommendations(),
       ]);
 
+      // Finished titles stay until removed manually; show keys merge episodes (no dupes).
       const continuing = (history || [])
-        .filter(
-          (h) =>
-            h &&
-            !h.completed &&
-            (h.progress || 0) >= settings.minProgressToTrack &&
-            (h.progress || 0) < settings.completedThreshold
-        )
+        .filter((h) => h && !h.deleted && (h.progress || 0) >= settings.minProgressToTrack)
         .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
         .slice(0, 12);
 

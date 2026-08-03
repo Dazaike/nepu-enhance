@@ -4,3 +4,5 @@ Thumbs.db
 *.zip
 *.crx
 *.pem
+__pycache__/
+*.pyc

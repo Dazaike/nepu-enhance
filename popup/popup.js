@@ -167,17 +167,25 @@
     });
   }
 
+  function historyProgressLabel(entry, useTime) {
+    // Episode-level only — never imply the whole show is done.
+    if (entry && entry.completed) return '100%';
+    return progressText(entry, useTime);
+  }
+
   function buildHistoryListRow(entry, pct, useTime) {
     const row = document.createElement('div');
-    row.className = 'row';
+    row.className = 'row' + (entry.completed ? ' row-finished' : '');
     const se = seLabel(entry);
-    const meta = `${se ? se + ' &middot; ' : ''}${progressText(entry, useTime)} &middot; ${relativeTime(entry.updatedAt)}`;
+    const prog = historyProgressLabel(entry, useTime);
+    const meta = `${se ? se + ' &middot; ' : ''}${prog} &middot; ${relativeTime(entry.updatedAt)}`;
+    const barPct = entry.completed ? 100 : pct;
     row.innerHTML = `
       ${thumbMarkup(entry.poster, 'lg')}
       <div class="row-body">
         <div class="row-title" title="${escapeHtml(entry.title || entry.url || '')}">${escapeHtml(entry.title || entry.url || 'Untitled')}</div>
         <div class="row-meta">${meta}</div>
-        <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div class="progress-track"><div class="progress-fill" style="width:${barPct}%"></div></div>
       </div>
       <div class="row-actions">${actionButtonsMarkup()}</div>
     `;
@@ -188,15 +196,18 @@
 
   function buildHistoryGridItem(entry, pct, useTime) {
     const item = document.createElement('div');
-    item.className = 'grid-item';
+    item.className = 'grid-item' + (entry.completed ? ' grid-item-finished' : '');
     const se = seLabel(entry);
+    const prog = historyProgressLabel(entry, useTime);
+    const barPct = entry.completed ? 100 : pct;
+    // No "Finished" badge on CW — full bar + 100% is enough (badge looked like the show ended).
     item.innerHTML = `
       <div class="grid-thumb">
         ${thumbMarkup(entry.poster)}
         ${se ? `<div class="grid-badge">${escapeHtml(se)}</div>` : ''}
         <div class="grid-overlay">
-          <div class="grid-progress-track"><div class="grid-progress-fill" style="width:${pct}%"></div></div>
-          <div class="grid-pct">${progressText(entry, useTime)} watched</div>
+          <div class="grid-progress-track"><div class="grid-progress-fill" style="width:${barPct}%"></div></div>
+          <div class="grid-pct">${escapeHtml(prog)}${entry.completed ? '' : ' watched'}</div>
           <div class="grid-actions">${actionButtonsMarkup()}</div>
         </div>
       </div>
@@ -211,17 +222,17 @@
     const [history, settings] = await Promise.all([NVT.listHistory(), NVT.getSettings()]);
     state.settings = settings;
 
+    // Keep finished titles in the list forever until the user removes them.
+    // Show-level keys already prevent duplicates when moving to the next episode.
     const entries = (history || [])
-      .filter((h) => h && !h.completed
-        && (h.progress || 0) >= settings.minProgressToTrack
-        && (h.progress || 0) < settings.completedThreshold)
+      .filter((h) => h && !h.deleted && (h.progress || 0) >= settings.minProgressToTrack)
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
     continueListEl.innerHTML = '';
     continueListEl.classList.toggle('grid', continueViewMode === 'grid');
 
     if (!entries.length) {
-      continueListEl.appendChild(emptyState('&#127916;', 'Nothing in progress. Start watching something!'));
+      continueListEl.appendChild(emptyState('&#127916;', 'Nothing here yet. Start watching something!'));
       return;
     }
     for (const entry of entries) {
@@ -277,53 +288,88 @@
         renderWatchlist();
       });
     }
-    const upBtn = root.querySelector('.move-up-btn');
-    if (upBtn) {
-      upBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        await NVT.moveWatchlistItem(item.id, -1);
-        renderWatchlist();
-      });
-    }
-    const downBtn = root.querySelector('.move-down-btn');
-    if (downBtn) {
-      downBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        await NVT.moveWatchlistItem(item.id, 1);
-        renderWatchlist();
-      });
-    }
   }
 
-  function buildWatchlistListRow(item, opts) {
+  /**
+   * Drag-and-drop reorder: grip handle starts the drag; any row/card is a drop target.
+   */
+  function wireWatchlistDrag(el, item) {
+    el.dataset.wlId = item.id;
+    const handle = el.querySelector('.wl-drag-handle');
+    if (!handle) return;
+
+    handle.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', item.id);
+      e.dataTransfer.effectAllowed = 'move';
+      // Some browsers need a short delay before class applies to the drag image.
+      requestAnimationFrame(() => el.classList.add('wl-dragging'));
+    });
+    handle.addEventListener('dragend', () => {
+      el.classList.remove('wl-dragging');
+      watchlistListEl.querySelectorAll('.wl-drag-over').forEach((n) => n.classList.remove('wl-drag-over'));
+    });
+
+    el.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (!el.classList.contains('wl-dragging')) el.classList.add('wl-drag-over');
+    });
+    el.addEventListener('dragleave', (e) => {
+      if (!el.contains(e.relatedTarget)) el.classList.remove('wl-drag-over');
+    });
+    el.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      el.classList.remove('wl-drag-over');
+      const fromId = e.dataTransfer.getData('text/plain');
+      const toId = item.id;
+      if (!fromId || fromId === toId) return;
+      const items = NVT.sortWatchlist(await NVT.listWatchlist());
+      const ids = items.map((i) => i.id);
+      const from = ids.indexOf(fromId);
+      const to = ids.indexOf(toId);
+      if (from < 0 || to < 0) return;
+      ids.splice(from, 1);
+      ids.splice(to, 0, fromId);
+      await NVT.reorderWatchlist(ids);
+      renderWatchlist();
+    });
+  }
+
+  function buildWatchlistListRow(item) {
     const row = document.createElement('div');
-    row.className = 'row';
+    row.className = 'row wl-sortable';
     let meta = seasonEpisodeLabel(item);
-    const hasNew = item.hasNewRelease && item.latestSeason != null && item.latestEpisode != null;
-    const caughtUp = !hasNew && NVT.isWatchlistCaughtUp(item);
+    // progressLabel can be "Caught up" even when a stale hasNewRelease was set.
+    const progressLabel = NVT.watchlistProgressLabel(item);
+    const hasNew =
+      !progressLabel &&
+      item.hasNewRelease &&
+      item.latestSeason != null &&
+      item.latestEpisode != null;
     if (hasNew) {
       meta += ` &middot; <span class="wl-status wl-status-new">NEW S${item.latestSeason} E${item.latestEpisode}</span>`;
-    } else if (caughtUp) {
-      meta += ` &middot; <span class="wl-status wl-status-complete">Complete</span>`;
+    } else if (progressLabel) {
+      const cls = progressLabel === 'Finished' ? 'wl-status-series-complete' : 'wl-status-complete';
+      meta += ` &middot; <span class="wl-status ${cls}">${progressLabel}</span>`;
+      if (
+        progressLabel === 'Caught up' &&
+        item.nextSeason != null &&
+        item.nextEpisode != null
+      ) {
+        meta += ` &middot; <span class="wl-status wl-status-next">Next S${item.nextSeason} E${item.nextEpisode}</span>`;
+      }
     }
     const clearNewBtn = hasNew
       ? `<button type="button" class="icon-btn clear-new-btn" title="Clear NEW badge (mark caught up)">✓</button>`
       : '';
-    const canUp = opts && opts.index > 0;
-    const canDown = opts && opts.index < opts.total - 1;
     row.innerHTML = `
+      <button type="button" class="wl-drag-handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder">&#8942;&#8942;</button>
       ${thumbMarkup(item.poster, 'lg')}
       <div class="row-body">
         <div class="row-title" title="${escapeHtml(item.title || item.url || '')}">${escapeHtml(item.title || item.url || 'Untitled')}</div>
         <div class="row-meta">${meta}</div>
       </div>
       <div class="row-actions">
-        <div class="reorder-btns">
-          <button type="button" class="icon-btn move-up-btn" title="Move up" ${canUp ? '' : 'disabled'}>&#9650;</button>
-          <button type="button" class="icon-btn move-down-btn" title="Move down" ${canDown ? '' : 'disabled'}>&#9660;</button>
-        </div>
         ${clearNewBtn}
         <button type="button" class="icon-btn open-btn" title="Open">&#9654;</button>
         <button type="button" class="icon-btn remove-wl-btn" title="Remove">&#10005;</button>
@@ -331,35 +377,43 @@
     `;
     wireThumbFallback(row);
     wireWatchlistActions(row, item);
+    wireWatchlistDrag(row, item);
     return row;
   }
 
-  function buildWatchlistGridItem(item, opts) {
+  function buildWatchlistGridItem(item) {
     const se = seLabel(item);
     const el = document.createElement('div');
-    el.className = 'grid-item';
-    const hasNew = item.hasNewRelease && item.latestSeason != null && item.latestEpisode != null;
-    const caughtUp = !hasNew && NVT.isWatchlistCaughtUp(item);
+    el.className = 'grid-item wl-sortable';
+    const progressLabel = NVT.watchlistProgressLabel(item);
+    const hasNew =
+      !progressLabel &&
+      item.hasNewRelease &&
+      item.latestSeason != null &&
+      item.latestEpisode != null;
     let badgeHtml = '';
     if (hasNew) {
       badgeHtml = `<button type="button" class="grid-badge new-release clear-new-btn" title="Clear NEW badge (mark caught up)">NEW S${item.latestSeason} E${item.latestEpisode} · ✓</button>`;
     } else if (se) {
       badgeHtml = `<div class="grid-badge">${escapeHtml(se)}</div>`;
     }
-    if (caughtUp) {
-      badgeHtml += `<div class="grid-badge complete" title="Caught up with all aired episodes">Complete</div>`;
+    if (progressLabel) {
+      const badgeCls = progressLabel === 'Finished' ? 'series-complete' : 'complete';
+      const tip =
+        progressLabel === 'Finished'
+          ? 'No more episodes left — show is done for you'
+          : 'Caught up with all aired episodes (more may come later)';
+      badgeHtml += `<div class="grid-badge ${badgeCls}" title="${tip}">${escapeHtml(progressLabel)}</div>`;
     }
-    const canUp = opts && opts.index > 0;
-    const canDown = opts && opts.index < opts.total - 1;
+    const seLine = seasonEpisodeLabel(item) + (progressLabel ? ` · ${progressLabel}` : '');
     el.innerHTML = `
       <div class="grid-thumb">
         ${thumbMarkup(item.poster)}
         ${badgeHtml}
+        <button type="button" class="wl-drag-handle grid-drag-handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder">&#8942;&#8942;</button>
         <div class="grid-overlay">
-          <div class="grid-se">${escapeHtml(seasonEpisodeLabel(item))}${caughtUp ? ' · Complete' : ''}</div>
+          <div class="grid-se">${escapeHtml(seLine)}</div>
           <div class="grid-actions">
-            <button type="button" class="icon-btn move-up-btn" title="Move up" ${canUp ? '' : 'disabled'}>&#9650;</button>
-            <button type="button" class="icon-btn move-down-btn" title="Move down" ${canDown ? '' : 'disabled'}>&#9660;</button>
             <button type="button" class="icon-btn open-btn" title="Open">&#9654;</button>
             <button type="button" class="icon-btn remove-wl-btn" title="Remove">&#10005;</button>
           </div>
@@ -369,6 +423,7 @@
     `;
     wireThumbFallback(el);
     wireWatchlistActions(el, item);
+    wireWatchlistDrag(el, item);
     return el;
   }
 
@@ -381,13 +436,12 @@
       watchlistListEl.appendChild(emptyState('&#128250;', 'Your watchlist is empty. Add pages you want to watch later.'));
       return;
     }
-    items.forEach((item, index) => {
-      const opts = { index, total: items.length };
+    for (const item of items) {
       const el = watchlistViewMode === 'grid'
-        ? buildWatchlistGridItem(item, opts)
-        : buildWatchlistListRow(item, opts);
+        ? buildWatchlistGridItem(item)
+        : buildWatchlistListRow(item);
       watchlistListEl.appendChild(el);
-    });
+    }
   }
 
   function showWatchlistError(message) {
@@ -692,10 +746,12 @@
 
   function updateTimingDisplay(offset, precise) {
     const n = Number(offset) || 0;
-    subTimingPrecise.checked = __omp_shell("!precise;")
-    subTimingOffset.hidden = __omp_shell("!precise;")
-    subTimingOffsetPrecise.hidden = __omp_shell("precise;")
-    if (precise) {
+    const isPrecise = !!precise;
+    subTimingPrecise.checked = isPrecise;
+    // Coarse slider when imprecise; number input when precise.
+    subTimingOffset.hidden = isPrecise;
+    subTimingOffsetPrecise.hidden = !isPrecise;
+    if (isPrecise) {
       subTimingOffsetPrecise.value = String(n);
     } else {
       subTimingOffset.value = String(Math.max(-10, Math.min(10, n)));
@@ -725,7 +781,7 @@
   function syncSubSoftBlurControls() {
     const soft = subStyleBg.value === 'soft';
     subStyleOpacityTitle.textContent = soft ? 'Blur hardness' : 'Background opacity';
-    subStyleBlurWrap.hidden = __omp_shell("soft;")
+    subStyleBlurWrap.hidden = !soft;
   }
 
   function writeStyleForm(style) {

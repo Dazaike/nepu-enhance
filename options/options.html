@@ -87,7 +87,7 @@
         <input type="number" id="min-duration-input" min="0" step="1" />
       </div>
       <div class="setting-row column">
-        <label for="completed-range">Mark watched at <span id="completed-value">92</span>%</label>
+        <label for="completed-range">Mark finished at <span id="completed-value">92</span>% (stays in Continue Watching until removed)</label>
         <input type="range" id="completed-range" min="0" max="100" step="1" />
       </div>
     </div>
@@ -225,16 +225,15 @@
   <section class="options-card">
     <h2>Import &amp; export</h2>
     <p class="muted">
-      Download a JSON backup of Continue Watching, Watchlist, settings,
-      OpenSubtitles / TMDB API keys, and <strong>Dropbox OAuth</strong>
-      (app key + refresh/access tokens) so you can restore sync without
-      reconnecting. Import merges by default (newest wins), or replace from the file.
+      Download a JSON backup of <strong>settings</strong>, OpenSubtitles / TMDB API keys,
+      and <strong>Dropbox OAuth</strong> (so you can restore sync without reconnecting).
+      Continue Watching and Watchlist are <strong>not</strong> included unless you opt in
+      below — that avoids accidental overwrites of watch progress.
     </p>
     <p class="muted">
       Optional passphrase: locks Dropbox tokens and API keys with AES-GCM
-      (PBKDF2). History / watchlist / settings stay readable; you’ll need the
-      passphrase on import to restore Dropbox and keys. Leave blank to store
-      secrets in plain JSON — treat the file like a password.
+      (PBKDF2). You’ll need the passphrase on import to restore Dropbox and keys.
+      Leave blank to store secrets in plain JSON — treat the file like a password.
     </p>
     <div class="settings-list">
       <div class="setting-row column">
@@ -255,6 +254,19 @@
           class="backup-passphrase-confirm"
         />
       </div>
+      <div class="setting-row">
+        <label class="switch-label" for="backup-include-watch-toggle">
+          Include Continue Watching &amp; Watchlist (export and import)
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="backup-include-watch-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <p class="muted" style="margin-top:-4px;margin-bottom:10px">
+        Off by default. Turn on only when you intentionally want to back up or restore
+        watch history and the watchlist.
+      </p>
       <div class="tag-input-row backup-actions">
         <button type="button" id="export-backup-btn" class="btn btn-primary btn-sm">Export backup</button>
         <button type="button" id="import-backup-btn" class="btn btn-secondary btn-sm">Import backup…</button>
