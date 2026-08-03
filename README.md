@@ -202,7 +202,7 @@ for tagged versions and downloadable source archives.
 
 ### Changelog (recent)
 
-#### 6.1.0
+#### 6.4.3
 
 - Watchlist **Complete** badge when you’re caught up with all aired episodes (TMDB latest S/E)
 - Release checks always store latest season/episode (not only when NEW flips)
