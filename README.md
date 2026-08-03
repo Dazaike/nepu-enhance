@@ -3,7 +3,7 @@
 Chrome **Manifest V3** extension for [Nepu](https://nepu.to/) and its mirrors
 (`nepu.is`, `nepu.net`).
 
-**Current version: 6.0.0**
+**Current version: 6.0.1**
 
 ## Highlights
 
@@ -41,6 +41,11 @@ remove that entry (same as remove in the popup).
 
 Use the on-page bookmark control or **+ Add tab** in the popup. TV bookmarks
 advance to the episode you’re watching; movies stay as a single entry.
+
+When Continue Watching marks an episode **finished** (at the “Mark watched
+at %” threshold) and that show is bookmarked on the **same** season/episode,
+the Watchlist entry automatically moves to the **next** episode (same season,
+episode + 1). Open from Watchlist uses the updated episode URL when possible.
 
 ### Homepage rails
 
@@ -181,6 +186,10 @@ See [GitHub Releases](https://github.com/Dazaike/nepu-watch-tracker/releases)
 for tagged versions and downloadable source archives.
 
 ### Changelog (recent)
+
+#### 6.0.1
+
+- Finish an episode in Continue Watching → if Watchlist is on that same S/E, auto-advance bookmark to the next episode
 
 #### 6.0.0
 

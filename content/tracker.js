@@ -132,6 +132,20 @@
         payload.progress >= settings.minProgressToTrack || payload.completed;
       if (!shouldPersist) return;
       await NVT.upsertHistory(payload);
+      // Finished this episode → if Watchlist is still on the same S/E,
+      // move the bookmark to the next episode (e.g. E2 done → bookmark E3).
+      if (payload.completed) {
+        try {
+          await NVT.advanceWatchlistAfterEpisodeComplete(
+            payload.host,
+            payload.path,
+            payload.season,
+            payload.episode
+          );
+        } catch (advErr) {
+          console.debug('[NVT tracker] watchlist advance failed', advErr);
+        }
+      }
     } catch (err) {
       console.debug('[NVT tracker] persist failed', err);
     }

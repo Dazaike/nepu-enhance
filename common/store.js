@@ -245,6 +245,57 @@ const NVT = (() => {
   }
 
   /**
+   * Rewrite Nepu episode segments in a stored path/url so Open from
+   * Watchlist lands on the next episode after a finish advance.
+   */
+  function rewriteEpisodeRef(ref, season, episode) {
+    if (!ref || season == null || episode == null) return ref;
+    const s = Number(season);
+    const e = Number(episode);
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e < 1) return ref;
+    const next = String(ref).replace(
+      /\/season\/\d+\/episode\/\d+/i,
+      `/season/${s}/episode/${e}`
+    );
+    return next;
+  }
+
+  /**
+   * When Continue Watching marks an episode finished: if that show is on
+   * the Watchlist and the bookmark still points at the finished episode,
+   * advance the bookmark to the next episode (same season, episode + 1).
+   * Idempotent — once advanced, later complete saves no longer match.
+   * Never auto-adds; movies / missing S/E are left alone.
+   */
+  async function advanceWatchlistAfterEpisodeComplete(host, path, season, episode) {
+    const s = season != null && season !== '' ? Number(season) : NaN;
+    const e = episode != null && episode !== '' ? Number(episode) : NaN;
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e < 1) return null;
+
+    const existing = await getWatchlistFor(host, path);
+    if (!existing) return null;
+
+    const curS = existing.season != null ? Number(existing.season) : NaN;
+    const curE = existing.episode != null ? Number(existing.episode) : NaN;
+    if (!Number.isFinite(curS) || !Number.isFinite(curE)) return null;
+    if (curS !== s || curE !== e) return null;
+
+    const nextEpisode = e + 1;
+    const next = {
+      ...existing,
+      season: s,
+      episode: nextEpisode,
+      mediaType: existing.mediaType || 'tv',
+      path: rewriteEpisodeRef(existing.path, s, nextEpisode) || existing.path,
+      url: rewriteEpisodeRef(existing.url, s, nextEpisode) || existing.url,
+      updatedAt: Date.now(),
+      deleted: false,
+    };
+    await chrome.storage.local.set({ [WL_PREFIX + existing.id]: next });
+    return next;
+  }
+
+  /**
    * OpenSubtitles/TMDB API key + login state for the Nepu subtitle picker
    * (content/subtitles.js). Lives here — not per-origin page storage — so
    * one key/login works across nepu.to/.is/.net, and so the extension's
@@ -706,6 +757,7 @@ const NVT = (() => {
     clearWatchlist,
     isInWatchlist,
     getWatchlistFor,
+    advanceWatchlistAfterEpisodeComplete,
     getSubtitleAuth,
     setSubtitleAuth,
     getDropboxAuth,
