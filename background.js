@@ -16,7 +16,18 @@ importScripts('common/store.js');
  */
 
 const DROPBOX_SYNC_PATH = '/nepu-watch-tracker-sync.json';
-const MIN_AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes between automatic syncs
+const MIN_AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes between automatic (alarm/page) syncs
+const MAX_CHANGE_SYNCS_PER_MIN = 1;
+const CHANGE_SYNC_DEBOUNCE_MS = 1500;
+const CHANGE_SYNC_WINDOW_MS = 60 * 1000;
+
+// While a sync writes hist:/wl: keys back, ignore those storage events so we
+// don't re-enter change-triggered sync in a loop.
+let suppressChangeSyncFromStorage = false;
+let changeSyncPending = false;
+let changeSyncTimer = null;
+/** Timestamps of change-triggered sync attempts (sliding 1‑minute window). */
+const changeSyncTimes = [];
 
 // ---------------------------------------------------------------------------
 // 1. Dropbox Sync Engine
@@ -112,14 +123,131 @@ function mergeById(localList, remoteList) {
   return Array.from(map.values());
 }
 
-async function performDropboxSync(force) {
-  const status = await NVT.getSyncStatus();
-  const now = Date.now();
-  if (!force && status.lastSyncAt && now - status.lastSyncAt < MIN_AUTO_SYNC_INTERVAL_MS) {
-    return { ok: true, skipped: true, lastSyncAt: status.lastSyncAt };
+async function isDropboxConnected() {
+  const auth = await NVT.getDropboxAuth();
+  return !!(auth && auth.refreshToken && auth.appKey);
+}
+
+/**
+ * Periodic Dropbox sync alarm (every 5 minutes when auto-sync is on and
+ * Dropbox is connected). Page-open triggers still work; this is the real
+ * timer — previously only Nepu page loads kicked sync, so idle browsers
+ * never synced.
+ */
+async function setupDropboxSyncAlarm() {
+  try {
+    await chrome.alarms.clear('dropboxSync');
+    const settings = await NVT.getSettings();
+    if (settings.dropboxAutoSync === false) return { ok: true, enabled: false };
+    if (!(await isDropboxConnected())) return { ok: true, enabled: false, reason: 'not_connected' };
+    // First fire soon so a fresh connect / browser start doesn't wait a full period.
+    chrome.alarms.create('dropboxSync', { delayInMinutes: 0.5, periodInMinutes: 5 });
+    return { ok: true, enabled: true };
+  } catch (err) {
+    console.warn('[Nepu background] dropbox alarm setup failed:', err);
+    return { ok: false, error: String((err && err.message) || err) };
+  }
+}
+
+function pruneChangeSyncTimes(now = Date.now()) {
+  while (changeSyncTimes.length && now - changeSyncTimes[0] >= CHANGE_SYNC_WINDOW_MS) {
+    changeSyncTimes.shift();
+  }
+}
+
+/** ms until we may start another change-triggered sync (0 = free slot). */
+function msUntilChangeSyncSlot(now = Date.now()) {
+  pruneChangeSyncTimes(now);
+  if (changeSyncTimes.length < MAX_CHANGE_SYNCS_PER_MIN) return 0;
+  return Math.max(0, CHANGE_SYNC_WINDOW_MS - (now - changeSyncTimes[0]) + 25);
+}
+
+/**
+ * After CW progress / Watchlist mutations: debounced sync, at most once per
+ * minute. Bypasses the 5‑minute alarm throttle so devices stay closer in sync.
+ */
+function scheduleChangeTriggeredSync() {
+  changeSyncPending = true;
+  if (changeSyncTimer) clearTimeout(changeSyncTimer);
+  const wait = Math.max(CHANGE_SYNC_DEBOUNCE_MS, msUntilChangeSyncSlot());
+  changeSyncTimer = setTimeout(() => {
+    changeSyncTimer = null;
+    runChangeTriggeredSync().catch((err) => {
+      console.warn('[Nepu background] change-triggered sync failed:', err);
+    });
+  }, wait);
+}
+
+async function runChangeTriggeredSync() {
+  if (!changeSyncPending) return;
+  const settings = await NVT.getSettings();
+  if (settings.dropboxSyncOnChange === false) {
+    changeSyncPending = false;
+    return;
+  }
+  if (!(await isDropboxConnected())) {
+    changeSyncPending = false;
+    return;
   }
 
-  await NVT.setSyncStatus({ syncing: true });
+  const wait = msUntilChangeSyncSlot();
+  if (wait > 0) {
+    scheduleChangeTriggeredSync();
+    return;
+  }
+
+  changeSyncPending = false;
+  changeSyncTimes.push(Date.now());
+  // force:true bypasses 5‑min auto throttle; still shares in-flight guard.
+  const res = await performDropboxSync(true, { reason: 'change' });
+  // More hist/wl writes may have arrived during the upload.
+  if (changeSyncPending) scheduleChangeTriggeredSync();
+  return res;
+}
+
+/**
+ * @param {boolean} force - bypass 5‑min auto throttle (manual / change sync)
+ * @param {{ reason?: string }} [opts]
+ */
+async function performDropboxSync(force, opts) {
+  const reason = (opts && opts.reason) || (force ? 'manual' : 'auto');
+  const now = Date.now();
+  const settings = await NVT.getSettings();
+
+  // Change-triggered path has its own rate limit; alarm/page still respect dropboxAutoSync.
+  if (!force && reason !== 'change' && settings.dropboxAutoSync === false) {
+    return { ok: true, skipped: true, reason: 'disabled' };
+  }
+
+  if (!(await isDropboxConnected())) {
+    if (!force) return { ok: true, skipped: true, reason: 'not_connected' };
+  }
+
+  const status = await NVT.getSyncStatus();
+  // Avoid stacking runs if a previous sync is still in flight (or SW died
+  // mid-run — allow retry after 2 minutes of "syncing").
+  if (status.syncing) {
+    const started = Number(status.syncingStartedAt) || 0;
+    if (started && now - started < 2 * 60 * 1000) {
+      if (reason === 'change') {
+        changeSyncPending = true;
+        // Retry after the in-flight run should have finished.
+        if (!changeSyncTimer) {
+          changeSyncTimer = setTimeout(() => {
+            changeSyncTimer = null;
+            runChangeTriggeredSync().catch(() => {});
+          }, 5000);
+        }
+      }
+      return { ok: true, skipped: true, reason: 'in_progress', lastSyncAt: status.lastSyncAt };
+    }
+  }
+  if (!force && status.lastSyncAt && now - status.lastSyncAt < MIN_AUTO_SYNC_INTERVAL_MS) {
+    return { ok: true, skipped: true, reason: 'throttled', lastSyncAt: status.lastSyncAt };
+  }
+
+  await NVT.setSyncStatus({ syncing: true, syncingStartedAt: now });
+  suppressChangeSyncFromStorage = true;
   try {
     const token = await getValidDropboxToken();
     const remote = await dropboxDownload(token);
@@ -153,17 +281,36 @@ async function performDropboxSync(force) {
 
     await NVT.setSyncStatus({
       syncing: false,
+      syncingStartedAt: 0,
       lastSyncAt: now,
       lastSyncOk: true,
       lastSyncError: '',
     });
-    return { ok: true, lastSyncAt: now };
+    return { ok: true, lastSyncAt: now, reason };
   } catch (err) {
     const message = String((err && err.message) || err);
-    await NVT.setSyncStatus({ syncing: false, lastSyncOk: false, lastSyncError: message });
-    return { ok: false, error: message };
+    await NVT.setSyncStatus({
+      syncing: false,
+      syncingStartedAt: 0,
+      lastSyncOk: false,
+      lastSyncError: message,
+    });
+    return { ok: false, error: message, reason };
+  } finally {
+    // Brief hold so storage.onChanged from our own writes drains first.
+    setTimeout(() => {
+      suppressChangeSyncFromStorage = false;
+    }, 250);
   }
 }
+
+// Watch Continue Watching + Watchlist mutations and push soon (rate-limited).
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || suppressChangeSyncFromStorage) return;
+  const keys = Object.keys(changes || {});
+  if (!keys.some((k) => k.startsWith(NVT.HIST_PREFIX) || k.startsWith(NVT.WL_PREFIX))) return;
+  scheduleChangeTriggeredSync();
+});
 
 // ---------------------------------------------------------------------------
 // 2. New Release Tracking & Desktop Notifications
@@ -239,31 +386,32 @@ async function checkNewReleases(force) {
         const hadNewReleaseBefore = !!item.hasNewRelease;
         const hasNewRelease = isNewer && hasAired;
 
-        if (hasNewRelease || hadNewReleaseBefore !== hasNewRelease) {
-          const updated = {
-            ...item,
-            hasNewRelease,
-            latestSeason: s,
-            latestEpisode: e,
-            latestAirDate: airDate,
-            latestTitle: lastEp.name || '',
-            lastReleaseCheckAt: Date.now(),
-          };
-          await NVT.putWatchlistRaw(updated);
+        // Always store latest S/E so the popup can show "Complete" when the
+        // bookmark is at or past the last aired episode (not only when NEW flips).
+        const updated = {
+          ...item,
+          tmdbId: seriesId,
+          hasNewRelease,
+          latestSeason: s,
+          latestEpisode: e,
+          latestAirDate: airDate,
+          latestTitle: lastEp.name || '',
+          lastReleaseCheckAt: Date.now(),
+        };
+        await NVT.putWatchlistRaw(updated);
 
-          if (hasNewRelease && !hadNewReleaseBefore && settings.desktopNotificationsEnabled) {
-            newReleasesFound++;
-            try {
-              chrome.notifications.create('nepu-rel-' + item.id, {
-                type: 'basic',
-                iconUrl: 'icons/icon128.png',
-                title: `New Episode: ${item.title}`,
-                message: `Season ${s}, Episode ${e} (${lastEp.name || 'Latest'}) is out now! Click to open.`,
-                priority: 2,
-              });
-            } catch (notifErr) {
-              console.warn('[Nepu background] notification create failed:', notifErr);
-            }
+        if (hasNewRelease && !hadNewReleaseBefore && settings.desktopNotificationsEnabled) {
+          newReleasesFound++;
+          try {
+            chrome.notifications.create('nepu-rel-' + item.id, {
+              type: 'basic',
+              iconUrl: 'icons/icon128.png',
+              title: `New Episode: ${item.title}`,
+              message: `Season ${s}, Episode ${e} (${lastEp.name || 'Latest'}) is out now! Click to open.`,
+              priority: 2,
+            });
+          } catch (notifErr) {
+            console.warn('[Nepu background] notification create failed:', notifErr);
           }
         }
       } catch (itemErr) {
@@ -307,6 +455,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm && alarm.name === 'refreshRecommendations') {
     fetchRecommendations(false);
   }
+  if (alarm && alarm.name === 'dropboxSync') {
+    performDropboxSync(false).catch((err) => {
+      console.warn('[Nepu background] scheduled dropbox sync failed:', err);
+    });
+  }
 });
 
 chrome.notifications.onClicked.addListener(async (notifId) => {
@@ -339,12 +492,14 @@ async function maybeInitialRecommendationsFetch() {
 chrome.runtime.onInstalled.addListener(() => {
   setupReleaseAlarm();
   setupRecommendationsAlarm();
+  setupDropboxSyncAlarm();
   maybeInitialRecommendationsFetch();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   setupReleaseAlarm();
   setupRecommendationsAlarm();
+  setupDropboxSyncAlarm();
   maybeInitialRecommendationsFetch();
 });
 
@@ -462,7 +617,7 @@ async function fetchTmdbList(path, query, mediaType, apiKey, excludeIds) {
 
 async function fetchPersonalizedRail(watchlist, history, apiKey, excludeIds) {
   const seedCandidates = [
-    ...watchlist.slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)),
+    ...NVT.sortWatchlist(watchlist.slice()),
     ...history.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
   ].filter((item) => item && item.title);
 
@@ -588,8 +743,21 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 
   if (msg && msg.type === 'DROPBOX_SYNC') {
-    performDropboxSync(!!(msg.payload && msg.payload.force)).then(sendResponse);
+    performDropboxSync(!!(msg.payload && msg.payload.force))
+      .then(async (res) => {
+        // Keep the 5‑minute alarm in sync with connect / disconnect / settings.
+        await setupDropboxSyncAlarm();
+        sendResponse(res);
+      })
+      .catch((err) => sendResponse({ ok: false, error: String((err && err.message) || err) }));
     return true; // async response
+  }
+
+  if (msg && msg.type === 'UPDATE_DROPBOX_ALARM') {
+    setupDropboxSyncAlarm()
+      .then((res) => sendResponse(res || { ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: String((err && err.message) || err) }));
+    return true;
   }
 
   if (msg && msg.type === 'SEND_TEST_NOTIFICATION') {

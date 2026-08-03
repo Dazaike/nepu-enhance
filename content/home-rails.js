@@ -129,6 +129,16 @@
         background: #34d399 !important;
         filter: brightness(1.05);
       }
+      .nvt-rail-badge.nvt-rail-complete {
+        top: 6px;
+        left: auto;
+        right: 6px;
+        background: rgba(37, 99, 235, 0.92) !important;
+        color: #eff6ff !important;
+        font-weight: 700;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+        border: none;
+      }
       .nvt-rail-remove {
         position: absolute;
         top: 6px;
@@ -637,6 +647,21 @@
         }
       });
       thumb.appendChild(badge);
+    } else if (mode === 'watchlist') {
+      const se = seLabel(item);
+      if (se) {
+        const badge = document.createElement('div');
+        badge.className = 'nvt-rail-badge';
+        badge.textContent = se;
+        thumb.appendChild(badge);
+      }
+      if (NVT.isWatchlistCaughtUp(item)) {
+        const done = document.createElement('div');
+        done.className = 'nvt-rail-badge nvt-rail-complete';
+        done.textContent = 'Complete';
+        done.title = 'Caught up with all aired episodes';
+        thumb.appendChild(done);
+      }
     } else {
       const se = seLabel(item);
       if (se) {
@@ -758,10 +783,7 @@
         .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
         .slice(0, 12);
 
-      const watching = (watchlist || [])
-        .slice()
-        .sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
-        .slice(0, 12);
+      const watching = NVT.sortWatchlist(watchlist || []).slice(0, 12);
 
       // Prefer multi-rail cache. Fall back to legacy single `items`/`reason`
       // for caches written before multi-rail support.

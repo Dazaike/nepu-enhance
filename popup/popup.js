@@ -277,19 +277,42 @@
         renderWatchlist();
       });
     }
+    const upBtn = root.querySelector('.move-up-btn');
+    if (upBtn) {
+      upBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await NVT.moveWatchlistItem(item.id, -1);
+        renderWatchlist();
+      });
+    }
+    const downBtn = root.querySelector('.move-down-btn');
+    if (downBtn) {
+      downBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await NVT.moveWatchlistItem(item.id, 1);
+        renderWatchlist();
+      });
+    }
   }
 
-  function buildWatchlistListRow(item) {
+  function buildWatchlistListRow(item, opts) {
     const row = document.createElement('div');
     row.className = 'row';
     let meta = seasonEpisodeLabel(item);
     const hasNew = item.hasNewRelease && item.latestSeason != null && item.latestEpisode != null;
+    const caughtUp = !hasNew && NVT.isWatchlistCaughtUp(item);
     if (hasNew) {
-      meta += ` &middot; <span style="color:#10b981;font-weight:600">NEW S${item.latestSeason} E${item.latestEpisode}</span>`;
+      meta += ` &middot; <span class="wl-status wl-status-new">NEW S${item.latestSeason} E${item.latestEpisode}</span>`;
+    } else if (caughtUp) {
+      meta += ` &middot; <span class="wl-status wl-status-complete">Complete</span>`;
     }
     const clearNewBtn = hasNew
       ? `<button type="button" class="icon-btn clear-new-btn" title="Clear NEW badge (mark caught up)">✓</button>`
       : '';
+    const canUp = opts && opts.index > 0;
+    const canDown = opts && opts.index < opts.total - 1;
     row.innerHTML = `
       ${thumbMarkup(item.poster, 'lg')}
       <div class="row-body">
@@ -297,6 +320,10 @@
         <div class="row-meta">${meta}</div>
       </div>
       <div class="row-actions">
+        <div class="reorder-btns">
+          <button type="button" class="icon-btn move-up-btn" title="Move up" ${canUp ? '' : 'disabled'}>&#9650;</button>
+          <button type="button" class="icon-btn move-down-btn" title="Move down" ${canDown ? '' : 'disabled'}>&#9660;</button>
+        </div>
         ${clearNewBtn}
         <button type="button" class="icon-btn open-btn" title="Open">&#9654;</button>
         <button type="button" class="icon-btn remove-wl-btn" title="Remove">&#10005;</button>
@@ -307,24 +334,32 @@
     return row;
   }
 
-  function buildWatchlistGridItem(item) {
+  function buildWatchlistGridItem(item, opts) {
     const se = seLabel(item);
     const el = document.createElement('div');
     el.className = 'grid-item';
     const hasNew = item.hasNewRelease && item.latestSeason != null && item.latestEpisode != null;
+    const caughtUp = !hasNew && NVT.isWatchlistCaughtUp(item);
     let badgeHtml = '';
     if (hasNew) {
       badgeHtml = `<button type="button" class="grid-badge new-release clear-new-btn" title="Clear NEW badge (mark caught up)">NEW S${item.latestSeason} E${item.latestEpisode} · ✓</button>`;
     } else if (se) {
       badgeHtml = `<div class="grid-badge">${escapeHtml(se)}</div>`;
     }
+    if (caughtUp) {
+      badgeHtml += `<div class="grid-badge complete" title="Caught up with all aired episodes">Complete</div>`;
+    }
+    const canUp = opts && opts.index > 0;
+    const canDown = opts && opts.index < opts.total - 1;
     el.innerHTML = `
       <div class="grid-thumb">
         ${thumbMarkup(item.poster)}
         ${badgeHtml}
         <div class="grid-overlay">
-          <div class="grid-se">${escapeHtml(seasonEpisodeLabel(item))}</div>
+          <div class="grid-se">${escapeHtml(seasonEpisodeLabel(item))}${caughtUp ? ' · Complete' : ''}</div>
           <div class="grid-actions">
+            <button type="button" class="icon-btn move-up-btn" title="Move up" ${canUp ? '' : 'disabled'}>&#9650;</button>
+            <button type="button" class="icon-btn move-down-btn" title="Move down" ${canDown ? '' : 'disabled'}>&#9660;</button>
             <button type="button" class="icon-btn open-btn" title="Open">&#9654;</button>
             <button type="button" class="icon-btn remove-wl-btn" title="Remove">&#10005;</button>
           </div>
@@ -338,7 +373,7 @@
   }
 
   async function renderWatchlist() {
-    const items = (await NVT.listWatchlist()).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+    const items = NVT.sortWatchlist(await NVT.listWatchlist());
     watchlistListEl.innerHTML = '';
     watchlistListEl.classList.toggle('grid', watchlistViewMode === 'grid');
 
@@ -346,12 +381,13 @@
       watchlistListEl.appendChild(emptyState('&#128250;', 'Your watchlist is empty. Add pages you want to watch later.'));
       return;
     }
-    for (const item of items) {
+    items.forEach((item, index) => {
+      const opts = { index, total: items.length };
       const el = watchlistViewMode === 'grid'
-        ? buildWatchlistGridItem(item)
-        : buildWatchlistListRow(item);
+        ? buildWatchlistGridItem(item, opts)
+        : buildWatchlistListRow(item, opts);
       watchlistListEl.appendChild(el);
-    }
+    });
   }
 
   function showWatchlistError(message) {
@@ -832,6 +868,7 @@
   const useTimeToggle = document.getElementById('usetime-toggle');
   const modernUiToggle = document.getElementById('modernui-toggle');
   const dropboxAutoSyncToggle = document.getElementById('dropbox-autosync-toggle');
+  const dropboxSyncOnChangeToggle = document.getElementById('dropbox-synconchange-toggle');
   const dropboxSyncNowBtn = document.getElementById('dropbox-sync-now-btn');
   const dropboxStatusEl = document.getElementById('dropbox-status');
   const openOptionsBtn = document.getElementById('open-options-btn');
@@ -846,6 +883,7 @@
     useTimeToggle.checked = !!settings.useTimeProgress;
     modernUiToggle.checked = settings.nepuModernUi !== false;
     dropboxAutoSyncToggle.checked = settings.dropboxAutoSync !== false;
+    dropboxSyncOnChangeToggle.checked = settings.dropboxSyncOnChange !== false;
     minDurationInput.value = settings.minDurationSeconds;
     completedRange.value = Math.round((settings.completedThreshold || 0) * 100);
     completedValueEl.textContent = completedRange.value;
@@ -868,6 +906,12 @@
     });
     dropboxAutoSyncToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ dropboxAutoSync: dropboxAutoSyncToggle.checked });
+      chrome.runtime.sendMessage({ type: 'UPDATE_DROPBOX_ALARM' }, () => {
+        void chrome.runtime.lastError;
+      });
+    });
+    dropboxSyncOnChangeToggle.addEventListener('change', async () => {
+      state.settings = await NVT.setSettings({ dropboxSyncOnChange: dropboxSyncOnChangeToggle.checked });
     });
     minDurationInput.addEventListener('change', async () => {
       const v = Math.max(0, Math.round(Number(minDurationInput.value) || 0));

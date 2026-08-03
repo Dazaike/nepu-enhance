@@ -126,12 +126,22 @@
         </div>
       </div>
       <div class="setting-row">
-        <label class="switch-label" for="dropbox-autosync-toggle">Auto-sync on every Nepu page open</label>
+        <label class="switch-label" for="dropbox-autosync-toggle">Auto-sync every 5 minutes (and on Nepu page open)</label>
         <label class="switch">
           <input type="checkbox" id="dropbox-autosync-toggle" />
           <span class="switch-slider"></span>
         </label>
       </div>
+      <div class="setting-row">
+        <label class="switch-label" for="dropbox-synconchange-toggle">Sync on changes (Watchlist / Continue Watching)</label>
+        <label class="switch">
+          <input type="checkbox" id="dropbox-synconchange-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <p class="muted" style="margin-top:-4px;margin-bottom:10px">
+        When on, local progress or watchlist edits trigger a Dropbox sync soon after — at most <strong>once per minute</strong>.
+      </p>
       <div class="tag-input-row">
         <button type="button" id="dropbox-sync-now-btn" class="btn btn-secondary btn-sm">Sync now</button>
       </div>

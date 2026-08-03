@@ -36,6 +36,8 @@ const NVT = (() => {
     autoApplyCaptions: false,
     useTimeProgress: false,
     dropboxAutoSync: true,
+    /** Sync soon after CW progress / Watchlist changes (max once per minute). */
+    dropboxSyncOnChange: true,
     releaseTrackingEnabled: true,
     desktopNotificationsEnabled: true,
     releaseCheckIntervalHours: 12,
@@ -145,21 +147,109 @@ const NVT = (() => {
     if (Object.keys(map).length) await chrome.storage.local.set(map);
   }
 
+  /** Lower sortOrder appears first. Legacy items without sortOrder use -addedAt (newest first). */
+  function watchlistSortKey(item) {
+    if (item && item.sortOrder != null && Number.isFinite(Number(item.sortOrder))) {
+      return Number(item.sortOrder);
+    }
+    return -(item && item.addedAt ? Number(item.addedAt) : 0);
+  }
+
+  function compareWatchlistOrder(a, b) {
+    const ka = watchlistSortKey(a);
+    const kb = watchlistSortKey(b);
+    if (ka !== kb) return ka - kb;
+    return String((a && a.id) || '').localeCompare(String((b && b.id) || ''));
+  }
+
+  function sortWatchlist(items) {
+    return (items || []).slice().sort(compareWatchlistOrder);
+  }
+
+  /**
+   * True when TMDB latest S/E is known and the bookmark is at or past it
+   * (caught up with everything that has aired — show "Complete").
+   */
+  function isWatchlistCaughtUp(item) {
+    if (!item || item.hasNewRelease) return false;
+    const latS = item.latestSeason != null ? Number(item.latestSeason) : NaN;
+    const latE = item.latestEpisode != null ? Number(item.latestEpisode) : NaN;
+    const curS = item.season != null ? Number(item.season) : NaN;
+    const curE = item.episode != null ? Number(item.episode) : NaN;
+    if (!Number.isFinite(latS) || !Number.isFinite(latE)) return false;
+    if (!Number.isFinite(curS) || !Number.isFinite(curE)) return false;
+    return curS > latS || (curS === latS && curE >= latE);
+  }
+
   async function addWatchlist(item) {
     const id = idFor(item.host, item.path);
     const key = WL_PREFIX + id;
     const now = Date.now();
     const existing = (await chrome.storage.local.get(key))[key] || null;
+    let sortOrder =
+      item.sortOrder != null
+        ? item.sortOrder
+        : existing && existing.sortOrder != null
+          ? existing.sortOrder
+          : null;
+    if (sortOrder == null) {
+      const others = await listWatchlist();
+      const minKey = others.reduce((m, x) => Math.min(m, watchlistSortKey(x)), 0);
+      sortOrder = minKey - 1;
+    }
     const entry = {
       ...(existing || {}),
       ...item,
       id,
+      sortOrder,
       addedAt: (existing && existing.addedAt) || now,
       updatedAt: now,
       deleted: false,
     };
     await chrome.storage.local.set({ [key]: entry });
     return entry;
+  }
+
+  /**
+   * Persist explicit order from an ordered list of ids (index = sortOrder).
+   * Ids omitted from the array are appended after.
+   */
+  async function reorderWatchlist(orderedIds) {
+    const active = sortWatchlist(await listWatchlist());
+    if (!active.length) return [];
+    const byId = new Map(active.map((i) => [i.id, i]));
+    const seen = new Set();
+    const ordered = [];
+    for (const id of orderedIds || []) {
+      const item = byId.get(id);
+      if (item && !seen.has(id)) {
+        ordered.push(item);
+        seen.add(id);
+      }
+    }
+    for (const item of active) {
+      if (!seen.has(item.id)) ordered.push(item);
+    }
+    const map = {};
+    const now = Date.now();
+    ordered.forEach((item, index) => {
+      map[WL_PREFIX + item.id] = { ...item, sortOrder: index, updatedAt: now };
+    });
+    if (Object.keys(map).length) await chrome.storage.local.set(map);
+    return ordered.map((item, index) => ({ ...item, sortOrder: index, updatedAt: now }));
+  }
+
+  /** Move a watchlist item up (delta -1) or down (delta +1) in the sorted list. */
+  async function moveWatchlistItem(id, delta) {
+    const items = sortWatchlist(await listWatchlist());
+    const idx = items.findIndex((i) => i.id === id);
+    if (idx < 0) return null;
+    const j = idx + Number(delta);
+    if (!Number.isFinite(j) || j < 0 || j >= items.length) return items;
+    const next = items.slice();
+    const [row] = next.splice(idx, 1);
+    next.splice(j, 0, row);
+    return reorderWatchlist(next.map((i) => i.id));
   }
 
   /** Same rationale as putHistoryRaw — no auto-`addedAt` stamp. */
@@ -279,6 +369,14 @@ const NVT = (() => {
     const curE = existing.episode != null ? Number(existing.episode) : NaN;
     if (!Number.isFinite(curS) || !Number.isFinite(curE)) return null;
     if (curS !== s || curE !== e) return null;
+
+    // Don't advance past the last known aired episode (keeps "Complete" honest).
+    const latS = existing.latestSeason != null ? Number(existing.latestSeason) : NaN;
+    const latE = existing.latestEpisode != null ? Number(existing.latestEpisode) : NaN;
+    if (Number.isFinite(latS) && Number.isFinite(latE)) {
+      if (s > latS || (s === latS && e >= latE)) return existing;
+      if (s === latS && e + 1 > latE) return existing;
+    }
 
     const nextEpisode = e + 1;
     const next = {
@@ -758,6 +856,12 @@ const NVT = (() => {
     isInWatchlist,
     getWatchlistFor,
     advanceWatchlistAfterEpisodeComplete,
+    watchlistSortKey,
+    compareWatchlistOrder,
+    sortWatchlist,
+    isWatchlistCaughtUp,
+    reorderWatchlist,
+    moveWatchlistItem,
     getSubtitleAuth,
     setSubtitleAuth,
     getDropboxAuth,

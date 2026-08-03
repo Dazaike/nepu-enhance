@@ -3,7 +3,7 @@
 Chrome **Manifest V3** extension for [Nepu](https://nepu.to/) and its mirrors
 (`nepu.is`, `nepu.net`).
 
-**Current version: 6.0.1**
+**Current version: 6.4.3**
 
 ## Highlights
 
@@ -45,7 +45,16 @@ advance to the episode you’re watching; movies stay as a single entry.
 When Continue Watching marks an episode **finished** (at the “Mark watched
 at %” threshold) and that show is bookmarked on the **same** season/episode,
 the Watchlist entry automatically moves to the **next** episode (same season,
-episode + 1). Open from Watchlist uses the updated episode URL when possible.
+episode + 1), but **not past** the last aired episode TMDB knows about.
+Open from Watchlist uses the updated episode URL when possible.
+
+**Complete** status: after a release check, if your bookmark is at or past
+the latest aired episode, Watchlist shows **Complete** (list: next to S/E;
+grid / homepage rail: top-right badge). **NEW** still takes priority when
+something newer has aired.
+
+**Reorder:** use the ▲ / ▼ controls on each Watchlist row (list and grid)
+to change order; order is saved and used on the homepage rail too.
 
 ### Homepage rails
 
@@ -91,8 +100,13 @@ Dropbox **app folder** (newest wins on merge).
 2. Register the redirect URI shown on the options page.
 3. Paste the **App key** and click **Connect to Dropbox**.
 
-Sync runs when you open a Nepu page (throttled) or via **Sync now** in the
-popup.
+Auto-sync runs **every 5 minutes** in the background when Dropbox is connected
+(and auto-sync is on), plus when you open a Nepu page (throttled to at most
+once per 5 minutes), or anytime via **Sync now** in the popup / options.
+
+Optional **Sync on changes**: when Continue Watching progress or the Watchlist
+updates, a sync is scheduled shortly after (debounced), at most **once per
+minute**, so devices stay close without spamming Dropbox.
 
 ### Local import / export
 
@@ -147,7 +161,8 @@ Toggle: **Modern Netflix UI on Nepu** (options / popup settings).
 | Show time instead of percentage | `12:34 / 45:00` vs `28%` |
 | Minimum video length to track | Ignore short clips |
 | Mark watched at % | Drop from CW when progress is high enough |
-| Auto-sync with Dropbox | Sync on Nepu page open |
+| Auto-sync with Dropbox | Background every 5 min + on Nepu page open |
+| Sync on CW / Watchlist changes | Push soon after local edits (max 1× / min) |
 | Track new episode releases | TMDB background checks |
 | Desktop notifications | OS alerts for new episodes |
 | Show discovery rails on homepage | Multi-row TMDB rails |
@@ -186,6 +201,15 @@ See [GitHub Releases](https://github.com/Dazaike/nepu-watch-tracker/releases)
 for tagged versions and downloadable source archives.
 
 ### Changelog (recent)
+
+#### 6.1.0
+
+- Watchlist **Complete** badge when you’re caught up with all aired episodes (TMDB latest S/E)
+- Release checks always store latest season/episode (not only when NEW flips)
+- Watchlist **reorder** (▲ / ▼) in popup list & grid; order shared with homepage rail
+- Finish-advance no longer bumps past the last known aired episode
+- **Dropbox auto-sync:** real 5‑minute background alarm (was page-open only); re-sync on tab focus
+- **Sync on changes** toggle: CW progress / Watchlist edits trigger Dropbox sync (max once per minute)
 
 #### 6.0.1
 

@@ -15,6 +15,7 @@
   const useTimeToggle = document.getElementById('usetime-toggle');
   const modernUiToggle = document.getElementById('modernui-toggle');
   const dropboxAutoSyncToggle = document.getElementById('dropbox-autosync-toggle');
+  const dropboxSyncOnChangeToggle = document.getElementById('dropbox-synconchange-toggle');
   const relTrackToggle = document.getElementById('rel-track-toggle');
   const relNotifToggle = document.getElementById('rel-notif-toggle');
   const relIntervalSelect = document.getElementById('rel-interval-select');
@@ -34,6 +35,7 @@
     useTimeToggle.checked = !!settings.useTimeProgress;
     modernUiToggle.checked = settings.nepuModernUi !== false;
     dropboxAutoSyncToggle.checked = settings.dropboxAutoSync !== false;
+    dropboxSyncOnChangeToggle.checked = settings.dropboxSyncOnChange !== false;
     relTrackToggle.checked = !!settings.releaseTrackingEnabled;
     relNotifToggle.checked = !!settings.desktopNotificationsEnabled;
     relIntervalSelect.value = String(settings.releaseCheckIntervalHours || 12);
@@ -68,6 +70,12 @@
     });
     dropboxAutoSyncToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ dropboxAutoSync: dropboxAutoSyncToggle.checked });
+      chrome.runtime.sendMessage({ type: 'UPDATE_DROPBOX_ALARM' }, () => {
+        void chrome.runtime.lastError;
+      });
+    });
+    dropboxSyncOnChangeToggle.addEventListener('change', async () => {
+      state.settings = await NVT.setSettings({ dropboxSyncOnChange: dropboxSyncOnChangeToggle.checked });
     });
     relTrackToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ releaseTrackingEnabled: relTrackToggle.checked });
@@ -476,6 +484,9 @@
 
   dropboxDisconnectBtn.addEventListener('click', async () => {
     await NVT.clearDropboxAuth();
+    chrome.runtime.sendMessage({ type: 'UPDATE_DROPBOX_ALARM' }, () => {
+      void chrome.runtime.lastError;
+    });
     setDropboxStatus('Disconnected from Dropbox.', 'ok');
     await refreshDropboxStatus();
   });
@@ -528,7 +539,7 @@
 
       const curSe = item.season != null && item.episode != null ? `S${item.season} E${item.episode}` : 'Bookmarked';
       const latestSe = item.latestSeason != null && item.latestEpisode != null
-        ? ` · Latest: S${item.latestSeason} E${item.episode}${item.hasNewRelease ? ' (NEW)' : ''}`
+        ? ` · Latest: S${item.latestSeason} E${item.latestEpisode}${item.hasNewRelease ? ' (NEW)' : ''}${NVT.isWatchlistCaughtUp(item) ? ' · Complete' : ''}`
         : '';
 
       div.innerHTML = `

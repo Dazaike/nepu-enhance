@@ -324,11 +324,11 @@
   }
 
   /**
-   * "Sync every time you open the website": background.js itself throttles
-   * actual network calls (at most once every 5 minutes) and no-ops
-   * entirely when Dropbox isn't connected, so firing this on every page
-   * load here is cheap — it's independent of the trackingEnabled toggle,
-   * since syncing and watch-tracking are separate features.
+   * Opportunistic Dropbox sync when a Nepu page loads (in addition to the
+   * background 5‑minute alarm). background.js throttles network calls
+   * (min 5 minutes between auto syncs) and no-ops when Dropbox isn't
+   * connected or auto-sync is off — so this is cheap to fire often.
+   * Independent of trackingEnabled.
    */
   function maybeSyncDropbox(settings) {
     try {
@@ -346,6 +346,15 @@
   async function main() {
     const settings = await NVT.getSettings();
     maybeSyncDropbox(settings);
+    // SPA navigations rarely reload the document — re-ping sync when the
+    // tab becomes visible again so long sessions still push/pull.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        NVT.getSettings()
+          .then((s) => maybeSyncDropbox(s))
+          .catch(() => {});
+      }
+    });
     if (!settings.trackingEnabled) return;
 
     scanForVideos(document, settings);
