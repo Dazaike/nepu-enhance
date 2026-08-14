@@ -33,7 +33,7 @@
     resumeToggle.checked = !!settings.resumeEnabled;
     autoApplyToggle.checked = !!settings.autoApplyCaptions;
     useTimeToggle.checked = !!settings.useTimeProgress;
-    modernUiToggle.checked = settings.nepuModernUi !== false;
+    modernUiToggle.checked = settings.nepuEnhanceModernUi !== false && settings.nepuModernUi !== false;
     dropboxAutoSyncToggle.checked = settings.dropboxAutoSync !== false;
     dropboxSyncOnChangeToggle.checked = settings.dropboxSyncOnChange !== false;
     relTrackToggle.checked = !!settings.releaseTrackingEnabled;
@@ -66,7 +66,10 @@
       state.settings = await NVT.setSettings({ useTimeProgress: useTimeToggle.checked });
     });
     modernUiToggle.addEventListener('change', async () => {
-      state.settings = await NVT.setSettings({ nepuModernUi: modernUiToggle.checked });
+      state.settings = await NVT.setSettings({
+        nepuModernUi: modernUiToggle.checked,
+        nepuEnhanceModernUi: modernUiToggle.checked,
+      });
     });
     dropboxAutoSyncToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ dropboxAutoSync: dropboxAutoSyncToggle.checked });
@@ -198,7 +201,7 @@
         String(d.getMonth() + 1).padStart(2, '0'),
         String(d.getDate()).padStart(2, '0'),
       ].join('');
-      downloadJson(`nepu-watch-tracker-backup-${stamp}.json`, data);
+      downloadJson(`nepu-enhance-backup-${stamp}.json`, data);
       const bits = ['settings'];
       if (includeWatchData) {
         const h = (data.history || []).filter((x) => x && !x.deleted).length;
@@ -369,7 +372,7 @@
   });
 
   refreshSubAuthStatus().catch((err) => {
-    console.error('[Nepu Watch Tracker] subtitle auth status failed:', err);
+    console.error('[Nepu Enhance] subtitle auth status failed:', err);
   });
 
   // -------------------------------------------------------------------
@@ -521,7 +524,7 @@
   });
 
   refreshDropboxStatus().catch((err) => {
-    console.error('[Nepu Watch Tracker] dropbox status failed:', err);
+    console.error('[Nepu Enhance] dropbox status failed:', err);
   });
 
   // -------------------------------------------------------------------
@@ -680,12 +683,12 @@
     }
   });
   refreshRecStatusUI().catch((err) => {
-    console.error('[Nepu Watch Tracker] recommendations status init failed:', err);
+    console.error('[Nepu Enhance] recommendations status init failed:', err);
   });
   refreshReleaseStatusUI().catch((err) => {
-    console.error('[Nepu Watch Tracker] release status init failed:', err);
+    console.error('[Nepu Enhance] release status init failed:', err);
   });
   initSettings().catch((err) => {
-    console.error('[Nepu Watch Tracker] options init failed:', err);
+    console.error('[Nepu Enhance] options init failed:', err);
   });
 })();

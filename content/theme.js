@@ -1,5 +1,5 @@
 /**
- * Nepu Modern UI Overhaul — theme class toggle + search chrome.
+ * Nepu Enhance — theme class toggle + search chrome.
  *
  * - Toggles `nvt-modern-ui` on <html> from settings.
  * - Pins the header search pill (site centers it with left:50%).
@@ -22,12 +22,12 @@
   function applyTheme(enabled) {
     if (enabled !== false) {
       document.documentElement.classList.add('nvt-modern-ui');
+      if (document.body) document.body.classList.add('nvt-modern-ui');
       pinSearchBar();
       floatTypeaheadLists();
     } else {
       document.documentElement.classList.remove('nvt-modern-ui');
-      // Inline pin/float overrides are !important; strip them so the site
-      // chrome returns to stock when the modern UI is toggled off.
+      if (document.body) document.body.classList.remove('nvt-modern-ui');
       clearPinnedSearchStyles();
     }
   }
@@ -210,11 +210,14 @@
     }, 30);
   }
 
-  // Apply immediately using local storage or fallback defaults
+  // Apply immediately synchronously so the page never flashes or stays unstyled
+  applyTheme(true);
+
   try {
     chrome.storage.local.get('settings', (res) => {
       const s = res && res.settings;
-      applyTheme(!s || s.nepuModernUi !== false);
+      const enabled = !s || (s.nepuEnhanceModernUi !== false && s.nepuModernUi !== false && s.netbootModernUi !== false);
+      applyTheme(enabled);
     });
   } catch (_) {
     applyTheme(true);
@@ -224,7 +227,8 @@
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local' || !changes.settings) return;
       const s = changes.settings.newValue;
-      applyTheme(!s || s.nepuModernUi !== false);
+      const enabled = !s || (s.nepuEnhanceModernUi !== false && s.nepuModernUi !== false && s.netbootModernUi !== false);
+      applyTheme(enabled);
     });
   } catch (_) {
     /* ignore */

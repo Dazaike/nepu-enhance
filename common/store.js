@@ -43,6 +43,7 @@ const NVT = (() => {
     releaseCheckIntervalHours: 12,
     releaseOptOutIds: [],
     nepuModernUi: true,
+    nepuEnhanceModernUi: true,
     recommendationsEnabled: true,
     recommendationsCheckIntervalHours: 24,
     updatedAt: 0,
@@ -68,7 +69,12 @@ const NVT = (() => {
 
   async function getSettings() {
     const res = await chrome.storage.local.get(SETTINGS_KEY);
-    return { ...DEFAULT_SETTINGS, ...(res[SETTINGS_KEY] || {}) };
+    const stored = res[SETTINGS_KEY] || {};
+    const merged = { ...DEFAULT_SETTINGS, ...stored };
+    if (stored.nepuModernUi !== undefined && stored.nepuEnhanceModernUi === undefined) {
+      merged.nepuEnhanceModernUi = stored.nepuModernUi;
+    }
+    return merged;
   }
 
   async function setSettings(patch) {
@@ -322,7 +328,6 @@ const NVT = (() => {
     if (Object.keys(map).length) await chrome.storage.local.set(map);
     return ordered.map((item, index) => ({ ...item, sortOrder: index, updatedAt: now }));
   }
-
   /** Move a watchlist item up (delta -1) or down (delta +1) in the sorted list. */
   async function moveWatchlistItem(id, delta) {
     const items = sortWatchlist(await listWatchlist());
@@ -490,7 +495,7 @@ const NVT = (() => {
   }
 
   /**
-   * OpenSubtitles/TMDB API key + login state for the Nepu subtitle picker
+   * OpenSubtitles/TMDB API key + login state for the Nepu Enhance subtitle picker
    * (content/subtitles.js). Lives here — not per-origin page storage — so
    * one key/login works across nepu.to/.is/.net, and so the extension's
    * options page can manage it directly via chrome.storage.local.
@@ -604,7 +609,7 @@ const NVT = (() => {
   }
 
   // --- Backup crypto (optional passphrase for Dropbox OAuth + API keys) ---
-  const BACKUP_FORMAT = 'nepu-watch-tracker';
+  const BACKUP_FORMAT = 'nepu-enhance-watch-tracker';
   const BACKUP_VERSION = 2;
   const SECRETS_PBKDF2_ITERS = 250000;
 
@@ -787,7 +792,7 @@ const NVT = (() => {
     if (!payload || typeof payload !== 'object') {
       throw new Error('Invalid backup file (not a JSON object).');
     }
-    if (payload.format && payload.format !== BACKUP_FORMAT) {
+    if (payload.format && payload.format !== BACKUP_FORMAT && payload.format !== 'nepu-watch-tracker' && payload.format !== 'netboot-watch-tracker') {
       throw new Error(`Unsupported backup format: ${payload.format}`);
     }
     if (payload.version != null && Number(payload.version) > BACKUP_VERSION) {

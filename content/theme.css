@@ -1,6 +1,6 @@
 /* ==========================================================================
-   Nepu Modern UI Overhaul (Netflix / Plex Style Theme)
-   Targeting the real DOM of nepu.is:
+   Nepu Enhance — Modern UI Overhaul (Netflix / Plex Style Theme)
+   Targeting the real DOM of nepu mirrors (nepu.to / nepu.is / nepu.net):
    - Header: .app-header, .navbar, .app-navbar, .app-search, .video-search
    - Card Grids: .col, .list-movie, .list-media, .media-cover, .list-caption, .list-title, .list-year
    - Card Badges: .list-media-attr, .quality, .imdb
@@ -23,7 +23,7 @@
   --nvt-glass: rgba(11, 15, 25, 0.85);
 }
 
-/* nepu.is defines its own site-wide accent as `--theme-color: #c700a6`
+/* Site defines its own site-wide accent as `--theme-color: #c700a6`
    (pink/magenta) on `:root`, referenced ~113 times across search hover,
    scrollbar thumbs, watchlist badges, etc. Overriding it here (higher
    specificity than the page's own `:root` rule since this targets
@@ -37,20 +37,23 @@ html.nvt-modern-ui {
 html.nvt-modern-ui,
 .nvt-modern-ui body,
 .nvt-modern-ui .app,
-.nvt-modern-ui #app {
+.nvt-modern-ui #app,
+.nvt-modern-ui #root {
   background-color: var(--nvt-bg) !important;
   color: var(--nvt-text) !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, inter, "Helvetica Neue", Arial, sans-serif !important;
   -webkit-font-smoothing: antialiased;
 }
 
-/* 1b. Kill the site's centered max-width shell.
-   On wide viewports nepu centers .app (max-width + margin:auto), leaving
-   large empty gutters — most visible as dead space left of the sidebar
-   and right of the hero. Force full-bleed so the nav hugs the viewport
-   edge and content uses the remaining width. */
+/* 1b. Kill the site's centered max-width shell and eliminate dead space/gutters.
+   The site wraps the entire page in `body > div.container`, which Bootstrap
+   centers via `max-width: 1140px / 1320px` + `margin: 0 auto` (causing the
+   large empty black box on the left).
+   Force full-bleed so the layout and sidebar hug the left edge cleanly. */
 html.nvt-modern-ui,
-html.nvt-modern-ui body {
+html.nvt-modern-ui body,
+html body,
+body {
   max-width: none !important;
   width: 100% !important;
   margin: 0 !important;
@@ -58,6 +61,67 @@ html.nvt-modern-ui body {
   padding-right: 0 !important;
 }
 
+/* High-specificity container resets covering all Bootstrap breakpoints */
+html.nvt-modern-ui body > div.container,
+html.nvt-modern-ui body > .container,
+html.nvt-modern-ui .container,
+html.nvt-modern-ui .container-fluid,
+html.nvt-modern-ui .container-sm,
+html.nvt-modern-ui .container-md,
+html.nvt-modern-ui .container-lg,
+html.nvt-modern-ui .container-xl,
+html.nvt-modern-ui .container-xxl,
+.nvt-modern-ui body > div.container,
+.nvt-modern-ui body > .container,
+.nvt-modern-ui .container,
+.nvt-modern-ui .container-fluid,
+.nvt-modern-ui .container-sm,
+.nvt-modern-ui .container-md,
+.nvt-modern-ui .container-lg,
+.nvt-modern-ui .container-xl,
+.nvt-modern-ui .container-xxl,
+html.nvt-modern-ui .app,
+html.nvt-modern-ui #app,
+html.nvt-modern-ui #root,
+html.nvt-modern-ui .app-body,
+html.nvt-modern-ui .app-wrapper,
+html.nvt-modern-ui .app-container,
+html.nvt-modern-ui .app-layout,
+html.nvt-modern-ui .layout,
+html.nvt-modern-ui .layout-wrapper,
+html.nvt-modern-ui .main-wrapper,
+html.nvt-modern-ui .page-wrapper,
+html.nvt-modern-ui .site-wrapper,
+html.nvt-modern-ui .site-container,
+html.nvt-modern-ui .wrapper,
+html.nvt-modern-ui .content-wrapper,
+html.nvt-modern-ui .row,
+.nvt-modern-ui .app,
+.nvt-modern-ui #app,
+.nvt-modern-ui #root,
+.nvt-modern-ui .app-body,
+.nvt-modern-ui .app-wrapper,
+.nvt-modern-ui .app-container,
+.nvt-modern-ui .app-layout,
+.nvt-modern-ui .layout,
+.nvt-modern-ui .layout-wrapper,
+.nvt-modern-ui .main-wrapper,
+.nvt-modern-ui .page-wrapper,
+.nvt-modern-ui .site-wrapper,
+.nvt-modern-ui .site-container,
+.nvt-modern-ui .wrapper,
+.nvt-modern-ui .content-wrapper,
+.nvt-modern-ui .row,
+body > div.container {
+  max-width: 100% !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  box-sizing: border-box !important;
+}
+/* Top-level shell wrappers shouldn't add redundant left padding */
 .nvt-modern-ui .app,
 .nvt-modern-ui #app,
 .nvt-modern-ui .app-body,
@@ -66,10 +130,6 @@ html.nvt-modern-ui body {
 .nvt-modern-ui .main-wrapper,
 .nvt-modern-ui .page-wrapper,
 .nvt-modern-ui .wrapper {
-  max-width: none !important;
-  width: 100% !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
 }
@@ -86,28 +146,20 @@ html.nvt-modern-ui body {
   right: 0 !important;
 }
 
-/* Main column beside the left nav — drop Bootstrap-style container caps
-   that re-center the hero under a max-width. Keep side gutters so content
-   doesn't sit flush against the edges after full-bleed (site only had 10px). */
+/* Main content area beside the sidebar — clean consistent gutters */
 .nvt-modern-ui .app-content,
 .nvt-modern-ui .app-main,
 .nvt-modern-ui .app-page,
-.nvt-modern-ui .app-section,
 .nvt-modern-ui main,
-.nvt-modern-ui main.app-content,
-.nvt-modern-ui .container,
-.nvt-modern-ui .container-fluid,
-.nvt-modern-ui .container-lg,
-.nvt-modern-ui .container-xl,
-.nvt-modern-ui .container-xxl {
+.nvt-modern-ui main.app-content {
   max-width: none !important;
   width: 100% !important;
-  padding-left: 48px !important;
-  padding-right: 48px !important;
+  padding-left: 24px !important;
+  padding-right: 24px !important;
   box-sizing: border-box !important;
 }
 
-/* Sidebar hugs the left edge; kill phantom off-canvas / dual-rail offset. */
+/* Sidebar hugs the left edge cleanly without phantom offsets or margins */
 .nvt-modern-ui .app-sidebar,
 .nvt-modern-ui .sidebar,
 .nvt-modern-ui aside,
@@ -115,13 +167,19 @@ html.nvt-modern-ui body {
 .nvt-modern-ui .app-menu,
 .nvt-modern-ui .side-menu,
 .nvt-modern-ui .navbar-vertical,
-.nvt-modern-ui .nav-left {
+.nvt-modern-ui .nav-left,
+.nvt-modern-ui .sidebar-wrapper,
+.nvt-modern-ui .app-aside,
+.nvt-modern-ui .side-nav,
+.nvt-modern-ui .nav-sidebar,
+.nvt-modern-ui .left-sidebar,
+.nvt-modern-ui .menu-left,
+.nvt-modern-ui #sidebar,
+.nvt-modern-ui #sidebar-wrapper {
   margin-left: 0 !important;
   left: 0 !important;
+  transform: none !important;
 }
-
-
-
 /* 2. Glassmorphism Navigation / Header */
 .nvt-modern-ui .app-header {
   background: var(--nvt-glass) !important;
@@ -815,16 +873,10 @@ html.nvt-modern-ui .list-movie:hover .list-media .list-media-attr::before,
   .nvt-modern-ui .app-content,
   .nvt-modern-ui .app-main,
   .nvt-modern-ui .app-page,
-  .nvt-modern-ui .app-section,
   .nvt-modern-ui main,
-  .nvt-modern-ui main.app-content,
-  .nvt-modern-ui .container,
-  .nvt-modern-ui .container-fluid,
-  .nvt-modern-ui .container-lg,
-  .nvt-modern-ui .container-xl,
-  .nvt-modern-ui .container-xxl {
-    padding-left: 20px !important;
-    padding-right: 20px !important;
+  .nvt-modern-ui main.app-content {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
   }
 
   /* Search host: sit after the hamburger / brand, not desktop sidebar offset */
@@ -914,14 +966,8 @@ html.nvt-modern-ui .list-movie:hover .list-media .list-media-attr::before,
   .nvt-modern-ui .app-content,
   .nvt-modern-ui .app-main,
   .nvt-modern-ui .app-page,
-  .nvt-modern-ui .app-section,
   .nvt-modern-ui main,
-  .nvt-modern-ui main.app-content,
-  .nvt-modern-ui .container,
-  .nvt-modern-ui .container-fluid,
-  .nvt-modern-ui .container-lg,
-  .nvt-modern-ui .container-xl,
-  .nvt-modern-ui .container-xxl {
+  .nvt-modern-ui main.app-content {
     padding-left: 12px !important;
     padding-right: 12px !important;
   }

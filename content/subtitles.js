@@ -1,4 +1,4 @@
-// Nepu Subtitle Injector — Chrome extension content script (nepu.to/.is/.net)
+// Nepu Enhance Subtitle Injector — Chrome extension content script (nepu.to/.is/.net)
 //
 // Originally ported from a Tampermonkey userscript for Nepu subtitle
 // injection, then rearchitected so the entire
@@ -23,7 +23,7 @@
   // 1. Config / storage
   // ---------------------------------------------------------------------------
 
-  const APP_UA = 'NepuSubtitleInjector v1.0';
+  const APP_UA = 'NepuEnhanceSubtitleInjector v1.0';
   const OS_API = 'https://api.opensubtitles.com/api/v1';
   const TMDB_API = 'https://api.themoviedb.org/3';
   const OVERLAY_ID = 'nepu-subtitle-overlay';
@@ -317,17 +317,17 @@
         ok = true;
       }
     } catch (err) {
-      console.warn('[Nepu Subtitles] GM_setValue failed:', err);
+      console.warn('[Nepu Enhance Subtitles] GM_setValue failed:', err);
     }
     try {
       if (typeof GM !== 'undefined' && typeof GM.setValue === 'function') {
         Promise.resolve(GM.setValue(key, value)).catch((err) => {
-          console.warn('[Nepu Subtitles] GM.setValue failed:', err);
+          console.warn('[Nepu Enhance Subtitles] GM.setValue failed:', err);
         });
         ok = true;
       }
     } catch (err) {
-      console.warn('[Nepu Subtitles] GM.setValue failed:', err);
+      console.warn('[Nepu Enhance Subtitles] GM.setValue failed:', err);
     }
     return ok;
   }
@@ -341,7 +341,7 @@
         asyncOk = true;
       }
     } catch (err) {
-      console.warn('[Nepu Subtitles] await GM.setValue failed:', err);
+      console.warn('[Nepu Enhance Subtitles] await GM.setValue failed:', err);
     }
     return syncOk || asyncOk;
   }
@@ -360,7 +360,7 @@
       const auth = await NVT.getSubtitleAuth();
       Object.assign(subAuthCache, auth);
     } catch (err) {
-      console.warn('[Nepu Subtitles] failed to load API keys from extension storage:', err);
+      console.warn('[Nepu Enhance Subtitles] failed to load API keys from extension storage:', err);
     }
   }
 
@@ -962,12 +962,12 @@
 
   function removeInjectedTracks(video) {
     if (!video) return;
-    video.querySelectorAll('track[data-nepu-sub="1"]').forEach((t) => t.remove());
+    video.querySelectorAll('track[data-nepu-sub="1"], track[data-netboot-sub="1"]').forEach((t) => t.remove());
     try {
       const list = video.textTracks;
       for (let i = 0; i < list.length; i++) {
         const track = list[i];
-        if (track && track.label && String(track.label).startsWith('Nepu OS:')) {
+        if (track && track.label && (String(track.label).startsWith('Nepu OS:') || String(track.label).startsWith('Netboot OS:'))) {
           track.mode = 'disabled';
         }
       }
@@ -1137,7 +1137,7 @@
       host.id = OVERLAY_ID;
     }
     placeOverlayHost(host);
-    let caption = host.querySelector('.nepu-cap-text');
+    let caption = host.querySelector('.nepu-cap-text, .netboot-cap-text');
     if (!caption) {
       caption = document.createElement('div');
       caption.className = 'nepu-cap-text';
@@ -1159,7 +1159,7 @@
       caption.appendChild(inner);
       host.appendChild(caption);
     }
-    const inner = caption.querySelector('.nepu-cap-inner') || caption.firstElementChild;
+    const inner = caption.querySelector('.nepu-cap-inner, .netboot-cap-inner') || caption.firstElementChild;
     applyCaptionAppearance(caption, inner, getCaptionStyle());
     return { host, caption, inner };
   }
@@ -1251,7 +1251,7 @@
         const list = video.textTracks;
         for (let i = 0; i < list.length; i++) {
           const track = list[i];
-          if (track && track.label && String(track.label).startsWith('Nepu OS:')) {
+          if (track && track.label && (String(track.label).startsWith('Nepu OS:') || String(track.label).startsWith('Netboot OS:'))) {
             track.mode = mode;
           }
         }
@@ -1269,7 +1269,7 @@
 
     if (overlayState && overlayState.el) {
       placeOverlayHost(overlayState.el);
-      const caption = overlayState.el.querySelector('.nepu-cap-text');
+      const caption = overlayState.el.querySelector('.nepu-cap-text, .netboot-cap-text');
       if (caption && (hidden || videoFs)) caption.style.display = 'none';
     }
 
@@ -1798,7 +1798,7 @@
         identified.query || identified.title
       );
     } catch (err) {
-      console.debug('[Nepu Subtitles] auto-apply failed', err);
+      console.debug('[Nepu Enhance Subtitles] auto-apply failed', err);
     }
   }
 
@@ -2030,7 +2030,7 @@
         mediaType: 'tv',
       });
     } catch (err) {
-      console.debug('[Nepu Subtitles] watchlist auto-update failed', err);
+      console.debug('[Nepu Enhance Subtitles] watchlist auto-update failed', err);
       return null;
     }
   }
@@ -2045,7 +2045,7 @@
       btn.title = inList ? 'Remove from watchlist' : 'Add to watchlist';
       btn.setAttribute('aria-label', btn.title);
     } catch (err) {
-      console.debug('[Nepu Subtitles] watchlist state sync failed', err);
+      console.debug('[Nepu Enhance Subtitles] watchlist state sync failed', err);
     }
   }
 
@@ -2074,7 +2074,7 @@
       }
       await updateWatchlistButtonState(btn);
     } catch (err) {
-      console.debug('[Nepu Subtitles] watchlist toggle failed', err);
+      console.debug('[Nepu Enhance Subtitles] watchlist toggle failed', err);
     }
   }
 
@@ -2128,7 +2128,7 @@
       }
       updateWatchlistButtonState(btn);
     } catch (err) {
-      console.debug('[Nepu Subtitles] watchlist button injection failed', err);
+      console.debug('[Nepu Enhance Subtitles] watchlist button injection failed', err);
     }
   }
 

@@ -1,9 +1,9 @@
-# Nepu Watch Tracker & Subtitles
+# Nepu Enhance
 
 Chrome **Manifest V3** extension for [Nepu](https://nepu.to/) and its mirrors
 (`nepu.is`, `nepu.net`).
 
-**Current version: 6.4.4**
+**Current version: 6.4.5**
 
 ## Highlights
 
@@ -19,7 +19,7 @@ Chrome **Manifest V3** extension for [Nepu](https://nepu.to/) and its mirrors
 
 ## Install (unpacked)
 
-1. Clone or download this repository (or grab a [release](https://github.com/Dazaike/nepu-watch-tracker/releases)).
+1. Clone or download this repository (or grab a [release](https://github.com/Dazaike/nepu-enhance/releases)).
 2. Open `chrome://extensions`, enable **Developer mode**.
 3. Click **Load unpacked** and select the repository folder.
 4. Visit `nepu.to`, `nepu.is`, or `nepu.net`.
@@ -204,10 +204,16 @@ icons/
 
 ## Releases
 
-See [GitHub Releases](https://github.com/Dazaike/nepu-watch-tracker/releases)
+See [GitHub Releases](https://github.com/Dazaike/nepu-enhance/releases)
 for tagged versions and downloadable source archives.
 
 ### Changelog (recent)
+
+#### 6.4.5
+
+- Modern UI overhaul: high-specificity container resets, responsive side gutters, and full-bleed layout stabilization across breakpoints
+- Extension rebranding and compatibility unification to Nepu Enhance
+- Subtitle and caption selectors compatibility updates
 
 #### 6.4.4
 

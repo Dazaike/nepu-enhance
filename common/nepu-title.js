@@ -165,7 +165,7 @@ function scrapeJsonLdTitle() {
 
 function cleanPageTitle(raw) {
   return String(raw || '')
-    .replace(/\s*[|\-–—]\s*Nepu.*$/i, '')
+    .replace(/\s*[|\-–—]\s*(?:Nepu Enhance|Nepu|Netboot).*$/i, '')
     .replace(/\s+Online\s*(Free)?.*$/i, '')
     .replace(/\s+Watch\s+.*$/i, '')
     .trim();
@@ -235,3 +235,6 @@ function identifyTitle() {
             : 'document.title',
   };
 }
+
+// Compatibility alias
+const parseNetbootSlug = parseNepuSlug;

@@ -1,10 +1,10 @@
 importScripts('common/store.js');
 
 /**
- * NEPU_SUB_NET_FETCH: content/subtitles.js cannot reliably cross-origin
+ * NEPU_SUB_NET_FETCH / NEPU_ENHANCE_SUB_NET_FETCH: content/subtitles.js cannot reliably cross-origin
  * fetch OpenSubtitles/TMDB from a page's execution context.
  *
- * NEPU_SUB_OPEN_OPTIONS: opens full-page options screen.
+ * NEPU_SUB_OPEN_OPTIONS / NEPU_ENHANCE_SUB_OPEN_OPTIONS: opens full-page options screen.
  *
  * DROPBOX_SYNC: pulls/merges/pushes history, watchlist, and settings to Dropbox.
  *
@@ -15,7 +15,7 @@ importScripts('common/store.js');
  * REFRESH_RECOMMENDATIONS_NOW: triggers immediate TMDB "Recommended For You" refresh.
  */
 
-const DROPBOX_SYNC_PATH = '/nepu-watch-tracker-sync.json';
+const DROPBOX_SYNC_PATH = '/nepu-enhance-sync.json';
 const MIN_AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes between automatic (alarm/page) syncs
 const MAX_CHANGE_SYNCS_PER_MIN = 1;
 const CHANGE_SYNC_DEBOUNCE_MS = 1500;
@@ -144,7 +144,7 @@ async function setupDropboxSyncAlarm() {
     chrome.alarms.create('dropboxSync', { delayInMinutes: 0.5, periodInMinutes: 5 });
     return { ok: true, enabled: true };
   } catch (err) {
-    console.warn('[Nepu background] dropbox alarm setup failed:', err);
+    console.warn('[Nepu Enhance background] dropbox alarm setup failed:', err);
     return { ok: false, error: String((err && err.message) || err) };
   }
 }
@@ -173,7 +173,7 @@ function scheduleChangeTriggeredSync() {
   changeSyncTimer = setTimeout(() => {
     changeSyncTimer = null;
     runChangeTriggeredSync().catch((err) => {
-      console.warn('[Nepu background] change-triggered sync failed:', err);
+      console.warn('[Nepu Enhance background] change-triggered sync failed:', err);
     });
   }, wait);
 }
@@ -546,11 +546,11 @@ async function checkNewReleases(force) {
               priority: 2,
             });
           } catch (notifErr) {
-            console.warn('[Nepu background] notification create failed:', notifErr);
+            console.warn('[Nepu Enhance background] notification create failed:', notifErr);
           }
         }
       } catch (itemErr) {
-        console.warn('[Nepu background] release check failed for item:', item.title, itemErr);
+        console.warn('[Nepu Enhance background] release check failed for item:', item.title, itemErr);
       }
     }
 
@@ -579,7 +579,7 @@ async function setupReleaseAlarm() {
       chrome.alarms.create('checkNewReleases', { periodInMinutes: hours * 60 });
     }
   } catch (err) {
-    console.warn('[Nepu background] alarm setup failed:', err);
+    console.warn('[Nepu Enhance background] alarm setup failed:', err);
   }
 }
 
@@ -592,15 +592,15 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
   if (alarm && alarm.name === 'dropboxSync') {
     performDropboxSync(false).catch((err) => {
-      console.warn('[Nepu background] scheduled dropbox sync failed:', err);
+      console.warn('[Nepu Enhance background] scheduled dropbox sync failed:', err);
     });
   }
 });
 
 chrome.notifications.onClicked.addListener(async (notifId) => {
   if (!notifId) return;
-  if (notifId.startsWith('nepu-rel-')) {
-    const itemId = notifId.replace('nepu-rel-', '');
+  if (notifId.startsWith('nepu-rel-') || notifId.startsWith('nepu-enhance-rel-') || notifId.startsWith('netboot-rel-')) {
+    const itemId = notifId.replace(/^nepu-rel-|^nepu-enhance-rel-|^netboot-rel-/, '');
     const watchlist = await NVT.listWatchlist();
     const item = watchlist.find((w) => w.id === itemId);
     if (item && item.url) {
@@ -620,7 +620,7 @@ async function maybeInitialRecommendationsFetch() {
     const needsRails = !rec.updatedAt || !Array.isArray(rec.rails) || !rec.rails.length;
     if (needsRails) fetchRecommendations(false);
   } catch (err) {
-    console.warn('[Nepu background] initial recommendations fetch check failed:', err);
+    console.warn('[Nepu Enhance background] initial recommendations fetch check failed:', err);
   }
 }
 
@@ -775,7 +775,7 @@ async function fetchPersonalizedRail(watchlist, history, apiKey, excludeIds) {
         };
       }
     } catch (seedErr) {
-      console.warn('[Nepu background] recommendation seed failed:', seed.title, seedErr);
+      console.warn('[Nepu Enhance background] recommendation seed failed:', seed.title, seedErr);
     }
   }
   return null;
@@ -825,7 +825,7 @@ async function fetchRecommendations(force) {
           const items = await fetchTmdbList(def.path, def.query || {}, def.mediaType, apiKey, excludeIds);
           return items.length ? { id: def.id, title: def.title, items } : null;
         } catch (err) {
-          console.warn('[Nepu background] discovery rail failed:', def.id, err);
+          console.warn('[Nepu Enhance background] discovery rail failed:', def.id, err);
           return null;
         }
       })
@@ -863,7 +863,7 @@ async function setupRecommendationsAlarm() {
       chrome.alarms.create('refreshRecommendations', { periodInMinutes: hours * 60 });
     }
   } catch (err) {
-    console.warn('[Nepu background] recommendations alarm setup failed:', err);
+    console.warn('[Nepu Enhance background] recommendations alarm setup failed:', err);
   }
 }
 
@@ -872,7 +872,7 @@ async function setupRecommendationsAlarm() {
 // ---------------------------------------------------------------------------
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg && msg.type === 'NEPU_SUB_OPEN_OPTIONS') {
+  if (msg && (msg.type === 'NEPU_SUB_OPEN_OPTIONS' || msg.type === 'NEPU_ENHANCE_SUB_OPEN_OPTIONS' || msg.type === 'NETBOOT_SUB_OPEN_OPTIONS')) {
     chrome.runtime.openOptionsPage();
     return false;
   }
@@ -902,7 +902,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         {
           type: 'basic',
           iconUrl: 'icons/icon128.png',
-          title: 'Nepu Watch Tracker — Test Notification',
+          title: 'Nepu Enhance — Test Notification',
           message: 'Desktop notifications are working! You will be alerted when new episodes of Watchlist shows air.',
           priority: 2,
         },
@@ -934,7 +934,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 
-  if (!msg || msg.type !== 'NEPU_SUB_NET_FETCH') return false;
+  if (!msg || (msg.type !== 'NEPU_SUB_NET_FETCH' && msg.type !== 'NEPU_ENHANCE_SUB_NET_FETCH' && msg.type !== 'NETBOOT_SUB_NET_FETCH')) return false;
 
   const { method = 'GET', url, headers = {}, body } = msg.request || {};
   fetch(url, { method, headers, body })

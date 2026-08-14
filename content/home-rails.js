@@ -525,7 +525,7 @@
         const best = pickBestLink(links, title, mediaType);
         if (best) return best;
       } catch (err) {
-        console.debug('[Nepu Home Rails] resolve try failed', path, err);
+        console.debug('[Nepu Enhance Home Rails] resolve try failed', path, err);
       }
     }
     return null;
@@ -547,7 +547,7 @@
         return true;
       }
     } catch (err) {
-      console.debug('[Nepu Home Rails] search submit failed', err);
+      console.debug('[Nepu Enhance Home Rails] search submit failed', err);
     }
     try {
       location.href = `${location.origin}/search?q=${encodeURIComponent(title)}`;
@@ -584,7 +584,7 @@
         }
         fallbackSearchNavigate(title);
       } catch (err) {
-        console.debug('[Nepu Home Rails] openRecommend failed', err);
+        console.debug('[Nepu Enhance Home Rails] openRecommend failed', err);
         fallbackSearchNavigate(title);
       }
     })();
@@ -671,7 +671,7 @@
             await NVT.clearNewReleaseBadge(item.id);
             scheduleRender(50);
           } catch (err) {
-            console.debug('[Nepu Home Rails] clear NEW failed', err);
+            console.debug('[Nepu Enhance Home Rails] clear NEW failed', err);
           }
         });
         thumb.appendChild(badge);
@@ -735,7 +735,7 @@
           if (item && item.id) await NVT.removeHistory(item.id);
           scheduleRender(50);
         } catch (err) {
-          console.debug('[Nepu Home Rails] remove Continue Watching failed', err);
+          console.debug('[Nepu Enhance Home Rails] remove Continue Watching failed', err);
         }
       });
       thumb.appendChild(removeBtn);
@@ -887,7 +887,7 @@
 
       anchor.parentElement.insertBefore(wrapper, anchor);
     } catch (err) {
-      console.debug('[Nepu Home Rails] render failed', err);
+      console.debug('[Nepu Enhance Home Rails] render failed', err);
     }
   }
 

@@ -937,7 +937,7 @@
     resumeToggle.checked = !!settings.resumeEnabled;
     autoApplyToggle.checked = !!settings.autoApplyCaptions;
     useTimeToggle.checked = !!settings.useTimeProgress;
-    modernUiToggle.checked = settings.nepuModernUi !== false;
+    modernUiToggle.checked = settings.nepuEnhanceModernUi !== false && settings.nepuModernUi !== false;
     dropboxAutoSyncToggle.checked = settings.dropboxAutoSync !== false;
     dropboxSyncOnChangeToggle.checked = settings.dropboxSyncOnChange !== false;
     minDurationInput.value = settings.minDurationSeconds;
@@ -958,7 +958,10 @@
       renderContinue();
     });
     modernUiToggle.addEventListener('change', async () => {
-      state.settings = await NVT.setSettings({ nepuModernUi: modernUiToggle.checked });
+      state.settings = await NVT.setSettings({
+        nepuModernUi: modernUiToggle.checked,
+        nepuEnhanceModernUi: modernUiToggle.checked,
+      });
     });
     dropboxAutoSyncToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ dropboxAutoSync: dropboxAutoSyncToggle.checked });
@@ -1056,6 +1059,6 @@
   }
 
   boot().catch((err) => {
-    console.error('[Nepu Watch Tracker] popup init failed:', err);
+    console.error('[Nepu Enhance] popup init failed:', err);
   });
 })();

@@ -1,5 +1,5 @@
 /**
- * HTML5 <video> watch-progress tracker for Nepu (nepu.to/.is/.net — see
+ * HTML5 <video> watch-progress tracker for Nepu Enhance (nepu.to/.is/.net — see
  * manifest.json content_scripts). Powers "Continue Watching" and
  * auto-resume. Defensive by design: any failure here must never break the
  * host page.
