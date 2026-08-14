@@ -923,6 +923,8 @@
   const autoApplyToggle = document.getElementById('autoapply-toggle');
   const useTimeToggle = document.getElementById('usetime-toggle');
   const modernUiToggle = document.getElementById('modernui-toggle');
+  const discoveryToggle = document.getElementById('discovery-toggle');
+  const discoveryModeSelect = document.getElementById('discovery-mode-select');
   const dropboxAutoSyncToggle = document.getElementById('dropbox-autosync-toggle');
   const dropboxSyncOnChangeToggle = document.getElementById('dropbox-synconchange-toggle');
   const dropboxSyncNowBtn = document.getElementById('dropbox-sync-now-btn');
@@ -938,6 +940,8 @@
     autoApplyToggle.checked = !!settings.autoApplyCaptions;
     useTimeToggle.checked = !!settings.useTimeProgress;
     modernUiToggle.checked = settings.nepuEnhanceModernUi !== false && settings.nepuModernUi !== false;
+    if (discoveryToggle) discoveryToggle.checked = settings.recommendationsEnabled !== false;
+    if (discoveryModeSelect) discoveryModeSelect.value = settings.discoveryMode || 'tmdb';
     dropboxAutoSyncToggle.checked = settings.dropboxAutoSync !== false;
     dropboxSyncOnChangeToggle.checked = settings.dropboxSyncOnChange !== false;
     minDurationInput.value = settings.minDurationSeconds;
@@ -963,6 +967,18 @@
         nepuEnhanceModernUi: modernUiToggle.checked,
       });
     });
+    if (discoveryToggle) {
+      discoveryToggle.addEventListener('change', async () => {
+        state.settings = await NVT.setSettings({ recommendationsEnabled: discoveryToggle.checked });
+        chrome.runtime.sendMessage({ type: 'UPDATE_RECOMMENDATIONS_ALARM' });
+      });
+    }
+    if (discoveryModeSelect) {
+      discoveryModeSelect.addEventListener('change', async () => {
+        state.settings = await NVT.setSettings({ discoveryMode: discoveryModeSelect.value });
+        chrome.runtime.sendMessage({ type: 'UPDATE_RECOMMENDATIONS_ALARM' });
+      });
+    }
     dropboxAutoSyncToggle.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ dropboxAutoSync: dropboxAutoSyncToggle.checked });
       chrome.runtime.sendMessage({ type: 'UPDATE_DROPBOX_ALARM' }, () => {

@@ -286,4 +286,83 @@
       schedulePin();
     }
   });
+
+  /**
+   * Handles automatic tab activation on /search pages when a hash is present
+   * (e.g. #series or #movies). Dispatches mouse events, Bootstrap events, and
+   * manually toggles active classes on the tab and tab-pane.
+   */
+  function activateSearchTab(targetHash) {
+    const target = String(targetHash || location.hash || '').toLowerCase();
+    if (!target) return;
+    const key = target.replace(/^#/, '');
+    const tab =
+      document.getElementById(`${key}-tab`) ||
+      document.querySelector(`a.nav-link[href="#${key}"], a[data-toggle="tab"][href="#${key}"], [aria-controls="${key}"]`);
+    if (!tab) return;
+
+    // 1. Dispatch real native mouse event sequence
+    ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach((type) => {
+      tab.dispatchEvent(
+        new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+        })
+      );
+    });
+
+    // 2. Direct Bootstrap tab plugin trigger if jQuery/bootstrap exists on page
+    try {
+      const win = typeof window !== 'undefined' ? window : null;
+      if (win && win.$ && typeof win.$(tab).tab === 'function') {
+        win.$(tab).tab('show');
+      }
+    } catch (_) {}
+
+    // 3. Fallback: manual tab and tab-pane class synchronization
+    const nav = tab.closest('.nav-tabs, .nav, ul') || tab.parentElement;
+    if (nav) {
+      nav.querySelectorAll('.nav-link, a, button').forEach((link) => {
+        link.classList.remove('active');
+        link.setAttribute('aria-selected', 'false');
+      });
+    }
+    tab.classList.add('active');
+    tab.setAttribute('aria-selected', 'true');
+
+    const targetPane = document.getElementById(key) || document.querySelector(`.tab-pane#${key}`);
+    if (targetPane) {
+      const parent = targetPane.parentElement;
+      if (parent) {
+        parent.querySelectorAll('.tab-pane').forEach((p) => {
+          p.classList.remove('active', 'show');
+        });
+      }
+      targetPane.classList.add('active', 'show');
+    }
+  }
+
+  function checkAndActivateSearchTab() {
+    if (!location.pathname.includes('/search') && !document.querySelector('.nav-tabs, #movies-tab, #series-tab')) {
+      return;
+    }
+    const hash = (location.hash || '').toLowerCase();
+    if (hash === '#series' || hash === '#movies' || hash === '#episodes') {
+      activateSearchTab(hash);
+    }
+  }
+
+  // Run repeatedly during initial load to beat late DOM hydration/rendering
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      checkAndActivateSearchTab();
+      [100, 300, 600, 1200, 2000].forEach((t) => setTimeout(checkAndActivateSearchTab, t));
+    });
+  } else {
+    checkAndActivateSearchTab();
+    [100, 300, 600, 1200, 2000].forEach((t) => setTimeout(checkAndActivateSearchTab, t));
+  }
+
+  window.addEventListener('hashchange', checkAndActivateSearchTab);
 })();

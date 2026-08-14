@@ -207,6 +207,14 @@
         </label>
       </div>
       <div class="setting-row column">
+        <label for="rec-mode-select">Discovery source / mode</label>
+        <select id="rec-mode-select">
+          <option value="tmdb">TMDB API (Smart recommendations + genres)</option>
+          <option value="native">Native Nepu Catalog (Instant on-page rails &amp; direct links)</option>
+          <option value="both">Both (TMDB Discovery + Native Nepu Rails)</option>
+        </select>
+      </div>
+      <div class="setting-row column">
         <label for="rec-interval-select">Refresh frequency</label>
         <select id="rec-interval-select">
           <option value="6">Every 6 hours</option>

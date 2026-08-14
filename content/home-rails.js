@@ -500,7 +500,8 @@
 
   async function resolveNepuUrl(title, mediaType) {
     const endpoints = searchEndpoints(title);
-    for (const path of endpoints) {
+    // Query candidate search endpoints in parallel for fast resolution
+    const tasks = endpoints.map(async (path) => {
       try {
         const resp = await fetch(path, {
           credentials: 'same-origin',
@@ -509,7 +510,7 @@
             'X-Requested-With': 'XMLHttpRequest',
           },
         });
-        if (!resp.ok) continue;
+        if (!resp.ok) return null;
         const ct = (resp.headers.get('content-type') || '').toLowerCase();
         const text = await resp.text();
         let links = [];
@@ -522,35 +523,47 @@
         } else {
           links = collectLinksFromHtml(text);
         }
-        const best = pickBestLink(links, title, mediaType);
-        if (best) return best;
+        return pickBestLink(links, title, mediaType);
       } catch (err) {
         console.debug('[Nepu Enhance Home Rails] resolve try failed', path, err);
+        return null;
       }
-    }
-    return null;
+    });
+
+    const results = await Promise.all(tasks);
+    return results.find((link) => !!link) || null;
   }
 
-  function fallbackSearchNavigate(title) {
-    try {
-      const input =
-        document.getElementById('search-input') ||
-        document.querySelector('.app-search input, .typeahead__field input, input[name="q"]');
-      const form =
-        (input && input.form) ||
-        document.getElementById('navbarToggler') ||
-        document.querySelector('form.app-search, .app-search form, form[action*="search"]');
-      if (input && form) {
-        input.value = title;
-        if (typeof form.requestSubmit === 'function') form.requestSubmit();
-        else form.submit();
-        return true;
+  async function prefetchRecommendUrl(item) {
+    const title = (item && item.title) || '';
+    if (!title || (item && item.url && item.url !== '#')) return;
+    const key = cacheKeyFor(item);
+    if (urlResolveInflight.has(key)) return;
+    const cache = await readUrlCache();
+    if (cache[key] && cache[key].url) return;
+
+    const work = (async () => {
+      try {
+        const resolved = await resolveNepuUrl(title, item.mediaType);
+        if (resolved) await writeUrlCacheEntry(key, resolved);
+      } catch (_) {
+        /* ignore */
       }
-    } catch (err) {
-      console.debug('[Nepu Enhance Home Rails] search submit failed', err);
-    }
+    })();
+    urlResolveInflight.set(key, work);
+    work.finally(() => urlResolveInflight.delete(key));
+  }
+
+  function getSearchUrl(title, mediaType) {
+    const q = encodeURIComponent(title || '');
+    const hash = mediaType === 'tv' ? '#series' : mediaType === 'movie' ? '#movies' : '';
+    return `${location.origin}/search/${q}${hash}`;
+  }
+
+  function fallbackSearchNavigate(title, mediaType) {
+    const targetUrl = getSearchUrl(title, mediaType);
     try {
-      location.href = `${location.origin}/search?q=${encodeURIComponent(title)}`;
+      location.href = targetUrl;
       return true;
     } catch (_) {
       return false;
@@ -609,15 +622,17 @@
     const a = document.createElement('a');
     a.className = 'nvt-rail-card';
     if (mode === 'recommend') {
-      a.href = '#';
-      a.setAttribute('title', `Open “${item.title || ''}” on Nepu`);
-      a.addEventListener('click', (e) => {
-        e.preventDefault();
-        a.classList.add('nvt-rail-card-loading');
-        openRecommendItem(item).finally(() => {
-          a.classList.remove('nvt-rail-card-loading');
+      if (item.url && item.url !== '#') {
+        a.href = item.url;
+      } else {
+        const searchUrl = getSearchUrl(item.title, item.mediaType);
+        a.href = searchUrl;
+        a.setAttribute('title', `Search “${item.title || ''}” on Nepu`);
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          fallbackSearchNavigate(item.title || '', item.mediaType);
         });
-      });
+      }
     } else {
       a.href = item.url;
     }
@@ -794,6 +809,61 @@
     const el = document.getElementById(WRAPPER_ID);
     if (el) el.remove();
   }
+  function collectNativeNepuRails() {
+    const rails = [];
+    try {
+      const sections = document.querySelectorAll('.app-section, section.list-movie-section, .list-media-section');
+      sections.forEach((sec, idx) => {
+        if (sec.closest('#' + WRAPPER_ID)) return;
+        const headingEl = sec.querySelector('.app-heading .text, .app-heading h2, .app-heading, h2.heading');
+        const heading = headingEl ? headingEl.textContent.trim() : '';
+        if (!heading || heading.toLowerCase().includes('continue watching') || heading.toLowerCase().includes('watchlist')) return;
+
+        const cards = sec.querySelectorAll('a.list-media, a.list-movie, .list-movie a, .list-item a');
+        const items = [];
+        const seenUrls = new Set();
+        cards.forEach((card) => {
+          const href = card.getAttribute('href') || '';
+          if (!href || href === '#' || href.startsWith('javascript:') || seenUrls.has(href)) return;
+          seenUrls.add(href);
+
+          let title =
+            card.getAttribute('title') ||
+            (card.querySelector('.list-title, .caption, .title, .name') &&
+              card.querySelector('.list-title, .caption, .title, .name').textContent) ||
+            card.textContent ||
+            '';
+          title = String(title).replace(/\s+/g, ' ').trim();
+          if (!title) return;
+
+          const img = card.querySelector('img');
+          const poster = img ? (img.getAttribute('data-src') || img.getAttribute('data-original') || img.src || '') : '';
+          const abs = absolutize(href);
+          const isTv = /\/(?:show|tv)\//i.test(abs);
+
+          items.push({
+            id: `native-${idx}-${items.length}`,
+            title,
+            url: abs,
+            poster,
+            mediaType: isTv ? 'tv' : 'movie',
+          });
+        });
+
+        if (items.length) {
+          rails.push({
+            id: `native-rail-${idx}`,
+            title: `Nepu: ${heading}`,
+            items: items.slice(0, 14),
+            source: 'native',
+          });
+        }
+      });
+    } catch (e) {
+      console.debug('[Nepu Enhance Home Rails] native rail harvest failed', e);
+    }
+    return rails;
+  }
 
   async function renderHomeRails() {
     try {
@@ -819,30 +889,38 @@
 
       const watching = NVT.sortWatchlist(watchlist || []).slice(0, 12);
 
-      // Prefer multi-rail cache. Fall back to legacy single `items`/`reason`
-      // for caches written before multi-rail support.
+      const mode = settings.discoveryMode || 'tmdb';
       let discoveryRails = [];
+
       if (settings.recommendationsEnabled !== false) {
-        const cachedRails = Array.isArray(recommendations.rails) ? recommendations.rails : [];
-        if (cachedRails.length) {
-          discoveryRails = cachedRails
-            .filter((r) => r && r.title && Array.isArray(r.items) && r.items.length)
-            .map((r) => ({
-              id: r.id || r.title,
-              title: r.title,
-              items: r.items.slice(0, 14),
-            }));
-        } else if ((recommendations.items || []).length) {
-          discoveryRails = [
-            {
+        // TMDB discovery rails
+        if (mode === 'tmdb' || mode === 'both') {
+          const cachedRails = Array.isArray(recommendations.rails) ? recommendations.rails : [];
+          if (cachedRails.length) {
+            discoveryRails.push(
+              ...cachedRails
+                .filter((r) => r && r.title && Array.isArray(r.items) && r.items.length)
+                .map((r) => ({
+                  id: r.id || r.title,
+                  title: r.title,
+                  items: r.items.slice(0, 14),
+                }))
+            );
+          } else if ((recommendations.items || []).length) {
+            discoveryRails.push({
               id: 'legacy',
               title: recommendations.reason || 'Recommended For You',
               items: recommendations.items.slice(0, 14),
-            },
-          ];
+            });
+          }
+        }
+
+        // Native discovery rails
+        if (mode === 'native' || mode === 'both') {
+          const nativeRails = collectNativeNepuRails();
+          discoveryRails.push(...nativeRails);
         }
       }
-
       if (!continuing.length && !watching.length && !discoveryRails.length) {
         removeWrapper();
         lastSignature = null;

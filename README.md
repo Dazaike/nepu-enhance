@@ -3,7 +3,7 @@
 Chrome **Manifest V3** extension for [Nepu](https://nepu.to/) and its mirrors
 (`nepu.is`, `nepu.net`).
 
-**Current version: 6.4.5**
+**Current version: 6.4.6**
 
 ## Highlights
 
@@ -172,7 +172,8 @@ Toggle: **Modern Netflix UI on Nepu** (options / popup settings).
 | Sync on CW / Watchlist changes | Push soon after local edits (max 1× / min) |
 | Track new episode releases | TMDB background checks |
 | Desktop notifications | OS alerts for new episodes |
-| Show discovery rails on homepage | Multi-row TMDB rails |
+| Show discovery rails on homepage | Master on/off for homepage discovery rails |
+| Discovery source / mode | Choose **TMDB API**, **Native Nepu Catalog** (instant), or **Both** |
 | Modern Netflix UI on Nepu | Theme overhaul |
 
 ## Permissions
@@ -208,6 +209,11 @@ See [GitHub Releases](https://github.com/Dazaike/nepu-enhance/releases)
 for tagged versions and downloadable source archives.
 
 ### Changelog (recent)
+#### 6.4.6
+
+- Discovery speed optimizations: parallel TMDB resolution & instant direct search navigation from recommendation cards
+- Catalog mode toggles: choose between TMDB smart discovery, native Nepu catalog rails, or both
+- Automatic category tab activation on `/search/<query>#series` and `/search/<query>#movies`
 
 #### 6.4.5
 

@@ -46,9 +46,10 @@ const NVT = (() => {
     nepuEnhanceModernUi: true,
     recommendationsEnabled: true,
     recommendationsCheckIntervalHours: 24,
+    /** Discovery source: 'tmdb' (default), 'native' (instant Nepu catalog), or 'both' */
+    discoveryMode: 'tmdb',
     updatedAt: 0,
   });
-
   // Nepu episode pages look like "/show/<slug>/season/<n>/episode/<n>" — a
   // history/watchlist entry keyed on the full path would fork into a new
   // entry per episode. Normalize to the show-level path ("/show/<slug>")

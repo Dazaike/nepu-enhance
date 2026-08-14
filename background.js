@@ -756,10 +756,25 @@ async function fetchPersonalizedRail(watchlist, history, apiKey, excludeIds) {
     ...history.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
   ].filter((item) => item && item.title);
 
-  for (const seed of seedCandidates.slice(0, 8)) {
+  const topCandidates = seedCandidates.slice(0, 6);
+  if (!topCandidates.length) return null;
+
+  // Resolve candidate seeds in parallel for speed
+  const resolvedSeeds = await Promise.all(
+    topCandidates.map(async (seed) => {
+      try {
+        const resolved = await resolveTmdbSeed(seed, apiKey);
+        return resolved ? { seed, resolved } : null;
+      } catch (_) {
+        return null;
+      }
+    })
+  );
+
+  for (const entry of resolvedSeeds) {
+    if (!entry) continue;
+    const { seed, resolved } = entry;
     try {
-      const resolved = await resolveTmdbSeed(seed, apiKey);
-      if (!resolved) continue;
       const items = await fetchTmdbList(
         `/${resolved.mediaType}/${resolved.id}/recommendations`,
         {},
@@ -788,10 +803,12 @@ async function fetchRecommendations(force) {
       return { ok: true, skipped: true };
     }
 
+    const mode = settings.discoveryMode || 'tmdb';
     const subAuth = await NVT.getSubtitleAuth();
     const apiKey = subAuth.tmdbApiKey;
-    if (!apiKey) {
-      const msg = 'TMDB API key missing. Add a free TMDB key on the options page to enable recommendations.';
+
+    if (mode === 'tmdb' && !apiKey) {
+      const msg = 'TMDB API key missing. Add a free TMDB key on the options page or switch catalog to Native.';
       await NVT.setRecommendations({ checking: false, lastError: msg });
       return { ok: false, error: msg };
     }
@@ -799,8 +816,6 @@ async function fetchRecommendations(force) {
     await NVT.setRecommendations({ checking: true });
 
     const [watchlist, history] = await Promise.all([NVT.listWatchlist(), NVT.listHistory()]);
-
-    // Prefer not to re-surface titles already on the user's rails.
     const excludeIds = new Set();
     for (const item of [...watchlist, ...history]) {
       if (!item) continue;
@@ -812,29 +827,30 @@ async function fetchRecommendations(force) {
 
     const rails = [];
 
-    const personal = await fetchPersonalizedRail(watchlist, history, apiKey, excludeIds);
-    if (personal) {
-      rails.push(personal);
-      for (const it of personal.items) excludeIds.add(it.id);
+    // 1. Personalized and TMDB rails if mode is 'tmdb' or 'both'
+    if ((mode === 'tmdb' || mode === 'both') && apiKey) {
+      const personal = await fetchPersonalizedRail(watchlist, history, apiKey, excludeIds);
+      if (personal) {
+        rails.push(personal);
+        for (const it of personal.items) excludeIds.add(it.id);
+      }
+
+      const discoveryResults = await Promise.all(
+        DISCOVERY_RAIL_DEFS.map(async (def) => {
+          try {
+            const items = await fetchTmdbList(def.path, def.query || {}, def.mediaType, apiKey, excludeIds);
+            return items.length ? { id: def.id, title: def.title, items, source: 'tmdb' } : null;
+          } catch (err) {
+            console.warn('[Nepu Enhance background] discovery rail failed:', def.id, err);
+            return null;
+          }
+        })
+      );
+      for (const rail of discoveryResults) {
+        if (rail) rails.push(rail);
+      }
     }
 
-    // Discovery rows — fetch in parallel (one burst per refresh).
-    const discoveryResults = await Promise.all(
-      DISCOVERY_RAIL_DEFS.map(async (def) => {
-        try {
-          const items = await fetchTmdbList(def.path, def.query || {}, def.mediaType, apiKey, excludeIds);
-          return items.length ? { id: def.id, title: def.title, items } : null;
-        } catch (err) {
-          console.warn('[Nepu Enhance background] discovery rail failed:', def.id, err);
-          return null;
-        }
-      })
-    );
-    for (const rail of discoveryResults) {
-      if (rail) rails.push(rail);
-    }
-
-    // Back-compat single-rail fields (options UI + older code paths).
     const primary = rails[0] || { title: 'Trending Now', items: [] };
     const itemCount = rails.reduce((n, r) => n + (r.items ? r.items.length : 0), 0);
 

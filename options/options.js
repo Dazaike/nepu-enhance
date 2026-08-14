@@ -20,8 +20,8 @@
   const relNotifToggle = document.getElementById('rel-notif-toggle');
   const relIntervalSelect = document.getElementById('rel-interval-select');
   const recEnabledToggle = document.getElementById('rec-enabled-toggle');
+  const recModeSelect = document.getElementById('rec-mode-select');
   const recIntervalSelect = document.getElementById('rec-interval-select');
-  const minDurationInput = document.getElementById('min-duration-input');
   const completedRange = document.getElementById('completed-range');
   const completedValueEl = document.getElementById('completed-value');
   const clearHistoryBtn = document.getElementById('clear-history-btn');
@@ -40,6 +40,7 @@
     relNotifToggle.checked = !!settings.desktopNotificationsEnabled;
     relIntervalSelect.value = String(settings.releaseCheckIntervalHours || 12);
     recEnabledToggle.checked = settings.recommendationsEnabled !== false;
+    if (recModeSelect) recModeSelect.value = settings.discoveryMode || 'tmdb';
     recIntervalSelect.value = String(settings.recommendationsCheckIntervalHours || 24);
     minDurationInput.value = settings.minDurationSeconds;
     completedRange.value = Math.round((settings.completedThreshold || 0) * 100);
@@ -95,6 +96,12 @@
       state.settings = await NVT.setSettings({ recommendationsEnabled: recEnabledToggle.checked });
       chrome.runtime.sendMessage({ type: 'UPDATE_RECOMMENDATIONS_ALARM' });
     });
+    if (recModeSelect) {
+      recModeSelect.addEventListener('change', async () => {
+        state.settings = await NVT.setSettings({ discoveryMode: recModeSelect.value });
+        chrome.runtime.sendMessage({ type: 'UPDATE_RECOMMENDATIONS_ALARM' });
+      });
+    }
     recIntervalSelect.addEventListener('change', async () => {
       state.settings = await NVT.setSettings({ recommendationsCheckIntervalHours: Number(recIntervalSelect.value) });
       chrome.runtime.sendMessage({ type: 'UPDATE_RECOMMENDATIONS_ALARM' });
