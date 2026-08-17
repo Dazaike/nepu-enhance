@@ -3,7 +3,7 @@
 Chrome **Manifest V3** extension for [Nepu](https://nepu.to/) and its mirrors
 (`nepu.is`, `nepu.net`).
 
-**Current version: 6.4.6**
+**Current version: 6.4.7**
 
 ## Highlights
 
@@ -209,6 +209,10 @@ See [GitHub Releases](https://github.com/Dazaike/nepu-enhance/releases)
 for tagged versions and downloadable source archives.
 
 ### Changelog (recent)
+#### 6.4.7
+
+- Maintenance release (version bump; packaging and tag)
+
 #### 6.4.6
 
 - Discovery speed optimizations: parallel TMDB resolution & instant direct search navigation from recommendation cards
